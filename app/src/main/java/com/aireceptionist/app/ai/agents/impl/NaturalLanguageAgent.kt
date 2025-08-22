@@ -1,6 +1,8 @@
 package com.aireceptionist.app.ai.agents.impl
 
 import com.aireceptionist.app.ai.agents.*
+import com.aireceptionist.app.ai.llm.OnDeviceLLM
+import com.aireceptionist.app.ai.llm.LLMScenario
 import com.aireceptionist.app.data.models.Intent
 import com.aireceptionist.app.data.models.Entity
 import com.aireceptionist.app.utils.Logger
@@ -13,7 +15,9 @@ import javax.inject.Inject
 /**
  * Agent responsible for natural language understanding and intent recognition
  */
-class NaturalLanguageAgent @Inject constructor() : Agent {
+class NaturalLanguageAgent @Inject constructor(
+    private val onDeviceLLM: OnDeviceLLM? = null
+) : Agent {
     
     override val agentId = "natural_language"
     override val agentName = "Natural Language Understanding Agent"
@@ -89,7 +93,12 @@ class NaturalLanguageAgent @Inject constructor() : Agent {
         return try {
             Logger.d(TAG, "Processing text input: ${input.content}")
             
-            // Analyze intent and entities
+            // Try LLM-powered understanding first (if available)
+            if (onDeviceLLM?.isReady() == true) {
+                return processWithLLM(input)
+            }
+            
+            // Fallback to traditional NLP methods
             val intent = extractIntent(input.content)
             val entities = extractEntities(input.content)
             val sentiment = analyzeSentiment(input.content)
@@ -120,6 +129,176 @@ class NaturalLanguageAgent @Inject constructor() : Agent {
         } catch (e: Exception) {
             Logger.e(TAG, "Error processing text input", e)
             createErrorResponse("Natural language processing failed: ${e.message}")
+        }
+    }
+    
+    /**
+     * Process input using on-device LLM for superior understanding
+     */
+    private suspend fun processWithLLM(input: AgentInput): AgentResponse {
+        return try {
+            Logger.d(TAG, "Processing with on-device LLM: ${input.content}")
+            
+            // Build context for LLM understanding
+            val context = buildLLMContext(input)
+            
+            // Generate intelligent analysis using LLM
+            val analysisPrompt = \"\"\"
+                Analyze this customer message for intent, entities, and sentiment:
+                
+                Message: "${input.content}"
+                Context: Call in progress, customer service scenario
+                
+                Provide analysis in format:
+                Intent: [primary_intent]
+                Entities: [extracted_entities]  
+                Sentiment: [positive/negative/neutral]
+                Confidence: [0.0-1.0]
+                Next_Action: [suggested_next_step]
+            \"\"\".trimIndent()
+            
+            val llmResponse = onDeviceLLM!!.generateResponse(
+                prompt = analysisPrompt,
+                context = context
+            )
+            
+            // Parse LLM response to extract structured information
+            val parsedAnalysis = parseLLMAnalysis(llmResponse)
+            
+            AgentResponse(
+                agentId = agentId,
+                responseType = ResponseType.ANALYSIS_RESULT,
+                content = llmResponse,
+                confidence = parsedAnalysis["confidence"] as? Float ?: 0.8f,
+                actions = createActionsFromLLMAnalysis(parsedAnalysis),
+                nextSuggestedAgent = parsedAnalysis["next_agent"] as? String,
+                metadata = mapOf(
+                    "llm_analysis" to parsedAnalysis,
+                    "processing_method" to "on_device_llm",
+                    "model_info" to onDeviceLLM.getModelInfo(),
+                    "timestamp" to System.currentTimeMillis()
+                )
+            )
+            
+        } catch (e: Exception) {
+            Logger.e(TAG, "Error processing with LLM", e)
+            // Fallback to traditional methods
+            val intent = extractIntent(input.content)
+            val entities = extractEntities(input.content)
+            val sentiment = analyzeSentiment(input.content)
+            
+            AgentResponse(
+                agentId = agentId,
+                responseType = ResponseType.ACTION_COMMAND,
+                content = generateResponse(intent, entities),
+                confidence = intent.confidence,
+                actions = createActionsForIntent(intent, entities),
+                nextSuggestedAgent = determineNextAgent(intent),
+                metadata = mapOf(
+                    "fallback_reason" to e.message,
+                    "processing_method" to "traditional_nlp"
+                )
+            )
+        }
+    }
+    
+    /**
+     * Build context for LLM processing
+     */
+    private fun buildLLMContext(input: AgentInput): Map<String, Any> {
+        return mapOf(
+            "call_context" to (input.context?.toString() ?: ""),
+            "conversation_history" to (input.metadata["conversation_history"] ?: emptyList<String>()),
+            "business_context" to mapOf(
+                "type" to "customer_service",
+                "industry" to "general_business", 
+                "capabilities" to listOf("appointments", "information", "support")
+            ),
+            "agent_context" to mapOf(
+                "role" to "natural_language_understanding",
+                "capabilities" to capabilities.map { it.name }
+            )
+        )
+    }
+    
+    /**
+     * Parse LLM analysis response into structured format
+     */
+    private fun parseLLMAnalysis(llmResponse: String): Map<String, Any> {
+        val analysis = mutableMapOf<String, Any>()
+        val lines = llmResponse.lines()
+        
+        for (line in lines) {
+            when {
+                line.startsWith("Intent:", ignoreCase = true) -> {
+                    analysis["intent"] = line.substringAfter(":").trim()
+                }
+                line.startsWith("Entities:", ignoreCase = true) -> {
+                    val entitiesStr = line.substringAfter(":").trim()
+                    analysis["entities"] = entitiesStr.split(",").map { it.trim() }
+                }
+                line.startsWith("Sentiment:", ignoreCase = true) -> {
+                    analysis["sentiment"] = line.substringAfter(":").trim()
+                }
+                line.startsWith("Confidence:", ignoreCase = true) -> {
+                    val confidenceStr = line.substringAfter(":").trim()
+                    analysis["confidence"] = confidenceStr.toFloatOrNull() ?: 0.8f
+                }
+                line.startsWith("Next_Action:", ignoreCase = true) -> {
+                    val action = line.substringAfter(":").trim()
+                    analysis["next_action"] = action
+                    analysis["next_agent"] = mapActionToAgent(action)
+                }
+            }
+        }
+        
+        return analysis
+    }
+    
+    /**
+     * Create actions based on LLM analysis
+     */
+    private fun createActionsFromLLMAnalysis(analysis: Map<String, Any>): List<AgentAction> {
+        val actions = mutableListOf<AgentAction>()
+        
+        val intent = analysis["intent"] as? String ?: ""
+        val nextAction = analysis["next_action"] as? String ?: ""
+        
+        when {
+            intent.contains("appointment", ignoreCase = true) -> {
+                actions.add(AgentAction.SCHEDULE_APPOINTMENT)
+                actions.add(AgentAction.CHECK_CALENDAR)
+            }
+            intent.contains("information", ignoreCase = true) -> {
+                actions.add(AgentAction.PROVIDE_INFORMATION)
+                actions.add(AgentAction.SEARCH_KNOWLEDGE_BASE)
+            }
+            intent.contains("transfer", ignoreCase = true) || intent.contains("routing", ignoreCase = true) -> {
+                actions.add(AgentAction.ROUTE_CALL)
+                actions.add(AgentAction.CHECK_AVAILABILITY)
+            }
+            nextAction.contains("escalate", ignoreCase = true) -> {
+                actions.add(AgentAction.ESCALATE_TO_HUMAN)
+            }
+        }
+        
+        if (actions.isEmpty()) {
+            actions.add(AgentAction.CONTINUE_CONVERSATION)
+        }
+        
+        return actions
+    }
+    
+    /**
+     * Map LLM-suggested actions to specific agents
+     */
+    private fun mapActionToAgent(action: String): String? {
+        return when {
+            action.contains("appointment", ignoreCase = true) -> "appointment-agent"
+            action.contains("route", ignoreCase = true) || action.contains("transfer", ignoreCase = true) -> "call-routing-agent"
+            action.contains("emotional", ignoreCase = true) || action.contains("support", ignoreCase = true) -> "customer-service-agent"
+            action.contains("integrate", ignoreCase = true) || action.contains("external", ignoreCase = true) -> "integration-agent"
+            else -> null
         }
     }
     

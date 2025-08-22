@@ -1,6 +1,8 @@
 package com.aireceptionist.app.ai.agents
 
 import com.aireceptionist.app.ai.agents.impl.*
+import com.aireceptionist.app.ai.llm.OnDeviceLLM
+import com.aireceptionist.app.ai.llm.LLMScenario
 import com.aireceptionist.app.data.models.CallContext
 import com.aireceptionist.app.utils.Logger
 import kotlinx.coroutines.*
@@ -14,7 +16,9 @@ import javax.inject.Singleton
  * Manages agent lifecycle, routing, and orchestration
  */
 @Singleton
-class AgentManager @Inject constructor() {
+class AgentManager @Inject constructor(
+    private val onDeviceLLM: OnDeviceLLM
+) {
     
     private val agents = ConcurrentHashMap<String, Agent>()
     private val agentResponses = MutableSharedFlow<AgentResponse>()
@@ -31,16 +35,20 @@ class AgentManager @Inject constructor() {
         Logger.i(TAG, "Initializing AI Agent Manager")
         
         try {
-            // Create and initialize all agents
+            // Initialize the on-device LLM first
+            val llmInitialized = onDeviceLLM.initialize()
+            Logger.i(TAG, "On-Device LLM initialized: $llmInitialized")
+            
+            // Create and initialize all agents (now with LLM support)
             val agentList = listOf(
                 SpeechRecognitionAgent(),
-                NaturalLanguageAgent(),
-                CallRoutingAgent(),
-                CustomerServiceAgent(),
+                NaturalLanguageAgent(onDeviceLLM),
+                CallRoutingAgent(onDeviceLLM),
+                CustomerServiceAgent(onDeviceLLM),
                 VoiceSynthesisAgent(),
-                EmotionDetectionAgent(),
+                EmotionDetectionAgent(onDeviceLLM),
                 IntegrationAgent(),
-                AppointmentAgent()
+                AppointmentAgent(onDeviceLLM)
             )
             
             // Initialize agents concurrently
@@ -226,6 +234,162 @@ class AgentManager @Inject constructor() {
             confidence = 0.0f
         )
     }
+    
+    /**
+     * Generate intelligent response using on-device LLM
+     */
+    suspend fun generateIntelligentResponse(
+        userInput: String,
+        callContext: CallContext,
+        conversationHistory: List<String> = emptyList()
+    ): AgentResponse {
+        return try {
+            Logger.d(TAG, "Generating intelligent response for: $userInput")
+            
+            // Determine the scenario based on context and input
+            val scenario = determineScenario(userInput, callContext)
+            
+            // Build context for LLM
+            val llmContext = buildLLMContext(callContext, conversationHistory)
+            
+            // Generate response using LLM
+            val response = onDeviceLLM.generateContextualResponse(
+                scenario = scenario,
+                userInput = userInput,
+                context = llmContext
+            )
+            
+            AgentResponse(
+                agentId = "llm-agent",
+                content = response,
+                confidence = 0.95f,
+                responseType = ResponseType.TEXT_RESPONSE,
+                metadata = mapOf(
+                    "llm_scenario" to scenario.name,
+                    "model_info" to onDeviceLLM.getModelInfo(),
+                    "timestamp" to System.currentTimeMillis()
+                ),
+                nextSuggestedAgent = determineNextAgent(scenario, response)
+            )
+            
+        } catch (e: Exception) {
+            Logger.e(TAG, "Error generating intelligent response", e)
+            createErrorResponse("Failed to generate intelligent response: ${e.message}")
+        }
+    }
+    
+    /**
+     * Determine the appropriate LLM scenario based on input and context
+     */
+    private fun determineScenario(userInput: String, callContext: CallContext): LLMScenario {
+        return when {
+            callContext.callState == "RINGING" && userInput.isEmpty() -> 
+                LLMScenario.CALL_GREETING
+                
+            userInput.contains("appointment", ignoreCase = true) ||
+            userInput.contains("schedule", ignoreCase = true) ||
+            userInput.contains("book", ignoreCase = true) ->
+                LLMScenario.APPOINTMENT_SCHEDULING
+                
+            userInput.contains("transfer", ignoreCase = true) ||
+            userInput.contains("speak to", ignoreCase = true) ||
+            userInput.contains("department", ignoreCase = true) ->
+                LLMScenario.CALL_ROUTING
+                
+            callContext.emotionalState != null && 
+            callContext.emotionalState in listOf("frustrated", "angry", "upset") ->
+                LLMScenario.EMOTIONAL_RESPONSE
+                
+            else -> LLMScenario.CUSTOMER_INQUIRY
+        }
+    }
+    
+    /**
+     * Build context map for LLM processing
+     */
+    private fun buildLLMContext(
+        callContext: CallContext, 
+        conversationHistory: List<String>
+    ): Map<String, Any> {
+        return mapOf(
+            "businessName" to (callContext.businessContext?.get("name") ?: "our business"),
+            "timeOfDay" to determineTimeOfDay(),
+            "conversationHistory" to conversationHistory,
+            "callerId" to (callContext.callerId ?: "unknown"),
+            "callDuration" to callContext.callDuration,
+            "emotionalState" to (callContext.emotionalState ?: "neutral"),
+            "availableSlots" to getAvailableSlots(),
+            "services" to getBusinessServices(),
+            "departments" to listOf("sales", "support", "billing", "general"),
+            "policies" to getBusinessPolicies(),
+            "staffStatus" to getStaffAvailability()
+        )
+    }
+    
+    /**
+     * Determine next agent based on scenario and response
+     */
+    private fun determineNextAgent(scenario: LLMScenario, response: String): String? {
+        return when (scenario) {
+            LLMScenario.APPOINTMENT_SCHEDULING -> {
+                if (response.contains("available") || response.contains("schedule")) {
+                    "appointment-agent"
+                } else null
+            }
+            LLMScenario.CALL_ROUTING -> {
+                if (response.contains("transfer") || response.contains("connecting")) {
+                    "call-routing-agent"
+                } else null
+            }
+            LLMScenario.EMOTIONAL_RESPONSE -> {
+                if (response.contains("understand") || response.contains("help")) {
+                    "customer-service-agent"
+                } else null
+            }
+            else -> null
+        }
+    }
+    
+    /**
+     * Helper methods for context building
+     */
+    private fun determineTimeOfDay(): String {
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        return when (hour) {
+            in 5..11 -> "morning"
+            in 12..17 -> "afternoon" 
+            in 18..21 -> "evening"
+            else -> "night"
+        }
+    }
+    
+    private fun getAvailableSlots(): List<String> {
+        // This would typically come from a calendar integration
+        return listOf("9:00 AM", "11:00 AM", "2:00 PM", "4:00 PM")
+    }
+    
+    private fun getBusinessServices(): List<String> {
+        // This would come from business configuration
+        return listOf("consultation", "support", "sales", "technical assistance")
+    }
+    
+    private fun getBusinessPolicies(): String {
+        return "Standard business policies apply. We're committed to excellent customer service."
+    }
+    
+    private fun getStaffAvailability(): String {
+        return "Customer service representatives are available during business hours"
+    }
+    
+    /**
+     * Check if on-device LLM is ready
+     */
+    fun isLLMReady(): Boolean = onDeviceLLM.isReady()
+    
+    /**
+     * Get LLM model information
+     */
+    fun getLLMInfo(): Map<String, String> = onDeviceLLM.getModelInfo()
     
     companion object {
         private const val TAG = "AgentManager"

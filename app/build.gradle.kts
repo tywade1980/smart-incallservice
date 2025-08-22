@@ -7,6 +7,14 @@ plugins {
     id("kotlin-parcelize")
 }
 
+repositories {
+    google()
+    mavenCentral()
+    maven { url = uri("https://jitpack.io") }
+    maven { url = uri("https://maven.google.com") }
+    gradlePluginPortal()
+}
+
 android {
     namespace = "com.aireceptionist.app"
     compileSdk = 35
@@ -128,18 +136,25 @@ dependencies {
     implementation("com.github.bumptech.glide:glide:4.16.0")
     kapt("com.github.bumptech.glide:compiler:4.16.0")
     
-    // Audio Processing
-    implementation("com.arthenica:mobile-ffmpeg-audio:4.4.LTS")
+    // Audio Processing - Using standard Android MediaRecorder and AudioManager
+    // implementation("com.arthenica:mobile-ffmpeg-audio:4.4.LTS") // Commented out - using native Android audio
     
-    // ML/AI Libraries
+    // On-Device LLM - ONNX Runtime for Phi-3.5-mini model
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.16.3")
+    
+    // TensorFlow Lite for additional ML tasks
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
     implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.14.0")
     implementation("org.tensorflow:tensorflow-lite-gpu:2.14.0")
     
-    // Google ML Kit
-    implementation("com.google.mlkit:speech-recognition:16.0.0")
-    implementation("com.google.mlkit:text-recognition:16.0.0")
-    implementation("com.google.mlkit:face-detection:16.1.5")
+    // Tokenizer for LLM
+    implementation("ai.onnxruntime:onnxruntime-extensions-android:0.9.0")
+    
+    // Google ML Kit - Updated to available versions
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.0")
+    // Speech recognition will be handled by SpeechRecognizer (built into Android)
+    // Face detection commented out for now
+    // implementation("com.google.mlkit:face-detection:16.1.5")
     
     // Firebase (Optional for cloud features) - Commented out for initial build
     // implementation(platform("com.google.firebase:firebase-bom:32.4.0"))
@@ -151,10 +166,10 @@ dependencies {
     // WebRTC for VoIP (commented out due to compatibility issues)
     // implementation("org.webrtc:google-webrtc:1.0.32006")
     
-    // JWT for API authentication
-    implementation("io.jsonwebtoken:jjwt-api:0.11.5")
-    implementation("io.jsonwebtoken:jjwt-impl:0.11.5")
-    implementation("io.jsonwebtoken:jjwt-android:0.11.5")
+    // JWT for API authentication - Using available version
+    implementation("io.jsonwebtoken:jjwt-api:0.12.3")
+    implementation("io.jsonwebtoken:jjwt-impl:0.12.3")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.3")
     
     // Event Bus
     implementation("org.greenrobot:eventbus:3.3.1")
