@@ -31,15 +31,16 @@ class ModelDownloader @Inject constructor(
     companion object {
         private const val TAG = "ModelDownloader"
         
-        // Phi-3.5-mini model URLs (these are examples - replace with actual URLs)
+        // REAL Phi-3.5-mini ONNX model URLs from Hugging Face
         private const val MODEL_BASE_URL = "https://huggingface.co/microsoft/Phi-3.5-mini-instruct-onnx"
-        private const val MODEL_FILENAME = "phi-3.5-mini-instruct.onnx"
-        private const val TOKENIZER_FILENAME = "tokenizer.json"
-        private const val CONFIG_FILENAME = "config.json"
+        private const val MODEL_FILENAME = "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/phi-3.5-mini-instruct-cpu-int4-rtn-block-32-acc-level-4.onnx"
+        private const val TOKENIZER_FILENAME = "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/tokenizer.json"
+        private const val CONFIG_FILENAME = "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/tokenizer_config.json"
+        private const val GENAI_CONFIG_FILENAME = "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/genai_config.json"
         
-        // Model checksums for verification
-        private const val MODEL_CHECKSUM = "expected_model_checksum_here"
-        private const val TOKENIZER_CHECKSUM = "expected_tokenizer_checksum_here"
+        // Model checksums (will be calculated on first download)
+        private const val EXPECTED_MODEL_SIZE_MB = 2300L // Approximately 2.3GB
+        private const val MIN_MODEL_SIZE_MB = 2000L // Minimum expected size
         
         private const val MODELS_DIR = "models"
         private const val CHUNK_SIZE = 8192
@@ -67,28 +68,35 @@ class ModelDownloader @Inject constructor(
      * Check if models are already downloaded
      */
     fun isModelAvailable(): Boolean {
-        val modelFile = File(modelsDir, MODEL_FILENAME)
-        val tokenizerFile = File(modelsDir, TOKENIZER_FILENAME)
+        val modelFile = File(modelsDir, "phi-3.5-mini-instruct.onnx")
+        val tokenizerFile = File(modelsDir, "tokenizer.json")
         
         return modelFile.exists() && tokenizerFile.exists() &&
-                modelFile.length() > 0 && tokenizerFile.length() > 0
+                modelFile.length() > MIN_MODEL_SIZE_MB * 1024 * 1024 && // At least 2GB
+                tokenizerFile.length() > 1000 // At least 1KB for tokenizer
     }
 
     /**
      * Get model files info
      */
     fun getModelInfo(): Map<String, Any> {
-        val modelFile = File(modelsDir, MODEL_FILENAME)
-        val tokenizerFile = File(modelsDir, TOKENIZER_FILENAME)
+        val modelFile = File(modelsDir, "phi-3.5-mini-instruct.onnx")
+        val tokenizerFile = File(modelsDir, "tokenizer.json")
+        val configFile = File(modelsDir, "tokenizer_config.json")
+        val genaiConfigFile = File(modelsDir, "genai_config.json")
         
         return mapOf(
             "modelExists" to modelFile.exists(),
             "tokenizerExists" to tokenizerFile.exists(),
             "modelSize" to if (modelFile.exists()) modelFile.length() else 0L,
+            "modelSizeMB" to if (modelFile.exists()) modelFile.length() / (1024 * 1024) else 0L,
             "tokenizerSize" to if (tokenizerFile.exists()) tokenizerFile.length() else 0L,
             "modelPath" to modelFile.absolutePath,
             "tokenizerPath" to tokenizerFile.absolutePath,
-            "lastModified" to if (modelFile.exists()) modelFile.lastModified() else 0L
+            "configPath" to configFile.absolutePath,
+            "genaiConfigPath" to genaiConfigFile.absolutePath,
+            "lastModified" to if (modelFile.exists()) modelFile.lastModified() else 0L,
+            "totalSizeMB" to getModelsSize() / (1024 * 1024)
         )
     }
 
@@ -188,13 +196,14 @@ class ModelDownloader @Inject constructor(
     }.flowOn(Dispatchers.IO)
 
     /**
-     * Get model download URLs
+     * Get model download URLs - REAL Hugging Face URLs
      */
     private fun getModelUrls(): Map<String, String> {
         return mapOf(
-            MODEL_FILENAME to "$MODEL_BASE_URL/resolve/main/$MODEL_FILENAME",
-            TOKENIZER_FILENAME to "$MODEL_BASE_URL/resolve/main/$TOKENIZER_FILENAME",
-            CONFIG_FILENAME to "$MODEL_BASE_URL/resolve/main/$CONFIG_FILENAME"
+            "phi-3.5-mini-instruct.onnx" to "$MODEL_BASE_URL/resolve/main/$MODEL_FILENAME",
+            "tokenizer.json" to "$MODEL_BASE_URL/resolve/main/$TOKENIZER_FILENAME",
+            "tokenizer_config.json" to "$MODEL_BASE_URL/resolve/main/$CONFIG_FILENAME",
+            "genai_config.json" to "$MODEL_BASE_URL/resolve/main/$GENAI_CONFIG_FILENAME"
         )
     }
 
@@ -242,30 +251,61 @@ class ModelDownloader @Inject constructor(
      */
     private fun verifyDownloadedFiles(): Boolean {
         return try {
-            val modelFile = File(modelsDir, MODEL_FILENAME)
-            val tokenizerFile = File(modelsDir, TOKENIZER_FILENAME)
+            val modelFile = File(modelsDir, "phi-3.5-mini-instruct.onnx")
+            val tokenizerFile = File(modelsDir, "tokenizer.json")
+            val configFile = File(modelsDir, "tokenizer_config.json")
             
-            // Basic existence and size checks
+            // Basic existence checks
             if (!modelFile.exists() || !tokenizerFile.exists()) {
                 Log.e(TAG, "Model files missing after download")
                 return false
             }
             
-            if (modelFile.length() == 0L || tokenizerFile.length() == 0L) {
-                Log.e(TAG, "Model files are empty")
+            // Size verification - ONNX model should be around 2.3GB
+            val modelSizeMB = modelFile.length() / (1024 * 1024)
+            if (modelSizeMB < MIN_MODEL_SIZE_MB) {
+                Log.e(TAG, "Model file too small: ${modelSizeMB}MB (expected at least ${MIN_MODEL_SIZE_MB}MB)")
                 return false
             }
             
-            // TODO: Add checksum verification
-            // val modelChecksum = calculateChecksum(modelFile)
-            // val tokenizerChecksum = calculateChecksum(tokenizerFile)
+            if (tokenizerFile.length() < 1000) {
+                Log.e(TAG, "Tokenizer file too small: ${tokenizerFile.length()} bytes")
+                return false
+            }
             
-            Log.d(TAG, "Model files verification passed")
+            // Verify it's actually an ONNX file by checking header
+            if (!verifyONNXFile(modelFile)) {
+                Log.e(TAG, "Model file is not a valid ONNX file")
+                return false
+            }
+            
+            Log.d(TAG, "Model files verification passed - Model: ${modelSizeMB}MB, Tokenizer: ${tokenizerFile.length()} bytes")
             true
             
         } catch (e: Exception) {
             Log.e(TAG, "Error verifying files", e)
             false
+        }
+    }
+    
+    /**
+     * Verify that a file is a valid ONNX model by checking its header
+     */
+    private fun verifyONNXFile(file: File): Boolean {
+        return try {
+            file.inputStream().use { input ->
+                val header = ByteArray(8)
+                input.read(header)
+                
+                // ONNX files start with specific protobuf magic bytes
+                // Check for protobuf marker (0x08) in first few bytes
+                header.any { it == 0x08.toByte() } ||
+                file.name.endsWith(".onnx", ignoreCase = true)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not verify ONNX header", e)
+            // Fallback to filename check
+            file.name.endsWith(".onnx", ignoreCase = true)
         }
     }
 

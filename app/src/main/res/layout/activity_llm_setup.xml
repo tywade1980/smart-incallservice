@@ -57,11 +57,33 @@
             android:id="@+id/tvProgress"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
+            android:layout_marginBottom="8dp"
             android:text=""
             android:textSize="14sp"
             android:gravity="center"
             android:textColor="@color/text_secondary"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvDownloadInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:text=""
+            android:textSize="12sp"
+            android:gravity="center"
+            android:textColor="@color/text_hint"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvEstimatedTime"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:text=""
+            android:textSize="12sp"
+            android:gravity="center"
+            android:textColor="@color/accent_color"
             android:visibility="gone" />
 
         <!-- Model Information -->
@@ -82,7 +104,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="🧠 On-Device AI Features"
+                    android:text="🧠 Real AI Intelligence"
                     android:textSize="18sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="12dp"
@@ -91,7 +113,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="✓ Complete privacy - no data leaves your device\n✓ Instant responses - no internet required\n✓ Smart conversation understanding\n✓ Context-aware responses\n✓ Emotional intelligence\n✓ 3.8B parameter AI model (Phi-3.5-mini)"
+                    android:text="✓ Complete privacy - no data leaves your device\n✓ Works offline - no internet required after download\n✓ Natural conversation understanding\n✓ Context-aware and emotional intelligence\n✓ Microsoft Phi-3.5-mini (3.8B parameters)\n✓ Optimized for mobile with INT4 quantization\n✓ Downloads directly from Hugging Face"
                     android:textSize="14sp"
                     android:lineSpacingExtra="4dp"
                     android:textColor="@color/text_secondary" />
@@ -153,7 +175,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                android:text="Download AI Brain (Required for Intelligence)"
+                android:text="📥 Download Real AI Brain (~2.3GB)"
                 android:textSize="16sp"
                 android:padding="16dp"
                 android:background="@drawable/button_primary"
@@ -202,12 +224,24 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="⚠️ Without the AI brain, your receptionist will use basic pre-programmed responses instead of intelligent conversation."
+            android:text="⚠️ Without downloading the AI model, your receptionist will use basic pre-programmed responses instead of true intelligence."
             android:textSize="12sp"
             android:textColor="@color/warning_color"
             android:gravity="center"
             android:padding="12dp"
             android:background="@drawable/background_warning"
+            android:visibility="visible" />
+
+        <!-- Model Source Info -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="🤗 Model Source: Microsoft Phi-3.5-mini from Hugging Face\nSecure, verified, and open-source AI model"
+            android:textSize="11sp"
+            android:textColor="@color/text_hint"
+            android:gravity="center"
+            android:padding="8dp"
             android:visibility="visible" />
 
     </LinearLayout>

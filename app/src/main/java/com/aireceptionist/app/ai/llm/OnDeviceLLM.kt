@@ -33,8 +33,10 @@ class OnDeviceLLM @Inject constructor(
 ) {
     companion object {
         private const val TAG = "OnDeviceLLM"
-        private const val MODEL_PATH = "models/phi-3.5-mini-instruct.onnx"
-        private const val TOKENIZER_PATH = "models/tokenizer.json"
+        private const val MODEL_FILENAME = "phi-3.5-mini-instruct.onnx"
+        private const val TOKENIZER_FILENAME = "tokenizer.json"
+        private const val CONFIG_FILENAME = "tokenizer_config.json"
+        private const val GENAI_CONFIG_FILENAME = "genai_config.json"
         private const val MAX_TOKENS = 512
         private const val TEMPERATURE = 0.7f
         private const val TOP_P = 0.9f
@@ -67,10 +69,10 @@ Keep responses concise, professional, and helpful. Always maintain a friendly to
             // Initialize ONNX Runtime environment
             ortEnvironment = OrtEnvironment.getEnvironment()
             
-            // Load model from assets
-            val modelBytes = loadModelFromAssets()
+            // Load model from internal storage (downloaded by ModelDownloader)
+            val modelBytes = loadModelFromStorage()
             if (modelBytes == null) {
-                Log.e(TAG, "Failed to load model from assets")
+                Log.e(TAG, "Failed to load model from storage. Please download the model first.")
                 return@withContext false
             }
             
@@ -177,32 +179,62 @@ Respond with appropriate emotional intelligence and empathy.
     }
 
     /**
-     * Load model from assets
+     * Load model from internal storage (downloaded by ModelDownloader)
      */
-    private fun loadModelFromAssets(): ByteArray? {
+    private fun loadModelFromStorage(): ByteArray? {
         return try {
-            // First try to load the actual model file
-            context.assets.open(MODEL_PATH).use { inputStream ->
-                inputStream.readBytes()
+            val modelsDir = File(context.filesDir, "models")
+            val modelFile = File(modelsDir, MODEL_FILENAME)
+            
+            if (!modelFile.exists()) {
+                Log.e(TAG, "Model file not found at: ${modelFile.absolutePath}")
+                Log.i(TAG, "Please run ModelDownloader first to download the Phi-3.5-mini model")
+                return null
             }
+            
+            if (modelFile.length() < 1024 * 1024 * 1000) { // Less than 1GB is suspicious
+                Log.e(TAG, "Model file seems too small: ${modelFile.length()} bytes")
+                return null
+            }
+            
+            Log.i(TAG, "Loading ONNX model from: ${modelFile.absolutePath} (${modelFile.length() / (1024*1024)}MB)")
+            modelFile.readBytes()
+            
         } catch (e: IOException) {
-            Log.w(TAG, "Model file not found in assets, using placeholder")
-            // Return placeholder - in real implementation, you'd download the model
-            createPlaceholderModel()
+            Log.e(TAG, "Error loading model from storage", e)
+            null
+        } catch (e: OutOfMemoryError) {
+            Log.e(TAG, "Out of memory loading model - model may be too large", e)
+            null
         }
     }
 
     /**
-     * Create a placeholder model structure (for development)
+     * Load tokenizer configuration
      */
-    private fun createPlaceholderModel(): ByteArray {
-        // This is a placeholder - in production, you would:
-        // 1. Download Phi-3.5-mini ONNX model from HuggingFace
-        // 2. Bundle it with the app or download on first run
-        // 3. Store in app's private directory
-        
-        Log.i(TAG, "Using placeholder model - download real Phi-3.5-mini for production")
-        return ByteArray(1024) // Minimal placeholder
+    private fun loadTokenizerConfig(): Map<String, Any>? {
+        return try {
+            val modelsDir = File(context.filesDir, "models")
+            val tokenizerFile = File(modelsDir, TOKENIZER_FILENAME)
+            val configFile = File(modelsDir, CONFIG_FILENAME)
+            
+            if (!tokenizerFile.exists()) {
+                Log.e(TAG, "Tokenizer file not found")
+                return null
+            }
+            
+            // For now, return basic config - in production, parse the JSON files
+            mapOf(
+                "vocab_size" to 32064,
+                "model_type" to "phi3",
+                "tokenizer_path" to tokenizerFile.absolutePath,
+                "config_path" to if (configFile.exists()) configFile.absolutePath else null
+            )
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading tokenizer config", e)
+            null
+        }
     }
 
     /**
@@ -374,14 +406,39 @@ Respond with appropriate emotional intelligence and empathy.
      * Get model information
      */
     fun getModelInfo(): Map<String, String> {
+        val modelsDir = File(context.filesDir, "models")
+        val modelFile = File(modelsDir, MODEL_FILENAME)
+        val modelExists = modelFile.exists()
+        val modelSize = if (modelExists) "${modelFile.length() / (1024*1024)}MB" else "Not Downloaded"
+        
         return mapOf(
             "model" to "Phi-3.5-mini-instruct",
             "provider" to "Microsoft",
             "runtime" to "ONNX Runtime",
-            "status" to if (isInitialized) "Ready" else "Not Initialized",
+            "status" to when {
+                isInitialized -> "Ready"
+                modelExists -> "Downloaded, Not Initialized"
+                else -> "Not Downloaded"
+            },
             "parameters" to "3.8B",
-            "optimization" to "Mobile Optimized"
+            "optimization" to "INT4 Quantized for Mobile",
+            "model_size" to modelSize,
+            "model_path" to modelFile.absolutePath,
+            "huggingface_url" to "https://huggingface.co/microsoft/Phi-3.5-mini-instruct-onnx"
         )
+    }
+    
+    /**
+     * Check if the real model files are available
+     */
+    fun isModelDownloaded(): Boolean {
+        val modelsDir = File(context.filesDir, "models")
+        val modelFile = File(modelsDir, MODEL_FILENAME)
+        val tokenizerFile = File(modelsDir, TOKENIZER_FILENAME)
+        
+        return modelFile.exists() && tokenizerFile.exists() &&
+               modelFile.length() > 1024 * 1024 * 1000 && // At least 1GB
+               tokenizerFile.length() > 1000 // At least 1KB
     }
 }
 

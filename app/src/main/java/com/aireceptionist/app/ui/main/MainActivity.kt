@@ -13,8 +13,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.aireceptionist.app.databinding.ActivityMainBinding
 import com.aireceptionist.app.ui.call.CallActivity
 import com.aireceptionist.app.ui.settings.SettingsActivity
+import com.aireceptionist.app.ui.setup.LLMSetupActivity
+import com.aireceptionist.app.ai.llm.OnDeviceLLM
 import com.aireceptionist.app.utils.Logger
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 /**
  * Main activity of the AI Receptionist app
@@ -25,6 +28,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var viewModel: MainViewModel
     private lateinit var callHistoryAdapter: CallHistoryAdapter
+    
+    @Inject
+    lateinit var onDeviceLLM: OnDeviceLLM
     
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
