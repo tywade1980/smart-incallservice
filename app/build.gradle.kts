@@ -131,19 +131,20 @@ dependencies {
     // Audio Processing - Using standard Android MediaRecorder and AudioManager
     // implementation("com.arthenica:mobile-ffmpeg-audio:4.4.LTS") // Commented out - using native Android audio
     
-    // On-Device LLM - ONNX Runtime for Phi-3.5-mini model
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.16.3")
+    // On-Device LLM - ONNX Runtime for Phi-3.5-mini model (updated to latest)
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.22.0")
     
-    // TensorFlow Lite for additional ML tasks
-    implementation("org.tensorflow:tensorflow-lite:2.14.0")
-    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.14.0")
-    implementation("org.tensorflow:tensorflow-lite-gpu:2.14.0")
+    // TensorFlow Lite for additional ML tasks (updated to latest)
+    implementation("org.tensorflow:tensorflow-lite:2.17.0")
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.17.0")
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.17.0")
     
-    // Tokenizer for LLM (commented out until we verify the dependency exists)
-    // implementation("ai.onnxruntime:onnxruntime-extensions-android:0.9.0")
+    // ONNX Runtime Extensions for tokenization and text processing
+    // Note: Updated to use the correct Maven Central coordinates and latest version
+    implementation("com.microsoft.onnxruntime:onnxruntime-extensions-android:0.12.4")
     
-    // Google ML Kit - Updated to available versions
-    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.0")
+    // Google ML Kit - Updated to latest version
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
     // Speech recognition will be handled by SpeechRecognizer (built into Android)
     // Face detection commented out for now
     // implementation("com.google.mlkit:face-detection:16.1.5")
