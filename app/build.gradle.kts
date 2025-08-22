@@ -1,0 +1,172 @@
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("kotlin-kapt")
+    id("dagger.hilt.android.plugin")
+    id("androidx.navigation.safeargs.kotlin")
+    id("kotlin-parcelize")
+}
+
+android {
+    namespace = "com.aireceptionist.app"
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "com.aireceptionist.app"
+        minSdk = 26
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        // Room schema export directory
+        kapt {
+            arguments {
+                arg("room.schemaLocation", "$projectDir/schemas")
+            }
+        }
+        
+        buildConfigField("String", "API_BASE_URL", "\"https://api.aireceptionist.com\"")
+        buildConfigField("boolean", "DEBUG_MODE", "true")
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            buildConfigField("boolean", "DEBUG_MODE", "false")
+        }
+        debug {
+            isDebuggable = true
+            applicationIdSuffix = ".debug"
+        }
+    }
+    
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+    
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+    
+    buildFeatures {
+        viewBinding = true
+        buildConfig = true
+        dataBinding = true
+    }
+    
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+}
+
+dependencies {
+    // Core Android
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.android.material:material:1.10.0")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    
+    // Lifecycle and ViewModel
+    val lifecycleVersion = rootProject.extra["lifecycle_version"]
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycleVersion")
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:$lifecycleVersion")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
+    implementation("androidx.lifecycle:lifecycle-service:$lifecycleVersion")
+    
+    // Navigation
+    val navVersion = rootProject.extra["nav_version"]
+    implementation("androidx.navigation:navigation-fragment-ktx:$navVersion")
+    implementation("androidx.navigation:navigation-ui-ktx:$navVersion")
+    
+    // Room Database
+    val roomVersion = rootProject.extra["room_version"]
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    kapt("androidx.room:room-compiler:$roomVersion")
+    
+    // Dependency Injection - Hilt
+    val hiltVersion = rootProject.extra["hilt_version"]
+    implementation("com.google.dagger:hilt-android:$hiltVersion")
+    kapt("com.google.dagger:hilt-compiler:$hiltVersion")
+    implementation("androidx.hilt:hilt-work:1.1.0")
+    kapt("androidx.hilt:hilt-compiler:1.1.0")
+    
+    // Network - Retrofit & OkHttp
+    val retrofitVersion = rootProject.extra["retrofit_version"]
+    val okhttpVersion = rootProject.extra["okhttp_version"]
+    implementation("com.squareup.retrofit2:retrofit:$retrofitVersion")
+    implementation("com.squareup.retrofit2:converter-gson:$retrofitVersion")
+    implementation("com.squareup.retrofit2:converter-scalars:$retrofitVersion")
+    implementation("com.squareup.okhttp3:okhttp:$okhttpVersion")
+    implementation("com.squareup.okhttp3:logging-interceptor:$okhttpVersion")
+    
+    // Coroutines
+    val coroutinesVersion = rootProject.extra["coroutines_version"]
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutinesVersion")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
+    
+    // Work Manager
+    val workVersion = rootProject.extra["work_version"]
+    implementation("androidx.work:work-runtime-ktx:$workVersion")
+    
+    // JSON Processing
+    implementation("com.google.code.gson:gson:2.10.1")
+    
+    // Permissions
+    implementation("pub.devrel:easypermissions:3.0.0")
+    
+    // Image Loading
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    kapt("com.github.bumptech.glide:compiler:4.16.0")
+    
+    // Audio Processing
+    implementation("com.arthenica:mobile-ffmpeg-full:4.4.LTS")
+    
+    // ML/AI Libraries
+    implementation("org.tensorflow:tensorflow-lite:2.14.0")
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.14.0")
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.14.0")
+    
+    // Google ML Kit
+    implementation("com.google.mlkit:speech-recognition:16.0.0")
+    implementation("com.google.mlkit:text-recognition:16.0.0")
+    implementation("com.google.mlkit:face-detection:16.1.5")
+    
+    // Firebase (Optional for cloud features)
+    implementation(platform("com.google.firebase:firebase-bom:32.4.0"))
+    implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-functions-ktx")
+    
+    // WebRTC for VoIP
+    implementation("org.webrtc:google-webrtc:1.0.32006")
+    
+    // JWT for API authentication
+    implementation("io.jsonwebtoken:jjwt-api:0.11.5")
+    implementation("io.jsonwebtoken:jjwt-impl:0.11.5")
+    implementation("io.jsonwebtoken:jjwt-android:0.11.5")
+    
+    // Event Bus
+    implementation("org.greenrobot:eventbus:3.3.1")
+    
+    // Telephony helpers
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+    
+    // Testing
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    androidTestImplementation("androidx.room:room-testing:$roomVersion")
+    testImplementation("org.mockito:mockito-core:5.5.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
+}
