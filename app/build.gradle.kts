@@ -7,14 +7,6 @@ plugins {
     id("kotlin-parcelize")
 }
 
-repositories {
-    google()
-    mavenCentral()
-    maven { url = uri("https://jitpack.io") }
-    maven { url = uri("https://maven.google.com") }
-    gradlePluginPortal()
-}
-
 android {
     namespace = "com.aireceptionist.app"
     compileSdk = 35
@@ -147,8 +139,8 @@ dependencies {
     implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.14.0")
     implementation("org.tensorflow:tensorflow-lite-gpu:2.14.0")
     
-    // Tokenizer for LLM
-    implementation("ai.onnxruntime:onnxruntime-extensions-android:0.9.0")
+    // Tokenizer for LLM (commented out until we verify the dependency exists)
+    // implementation("ai.onnxruntime:onnxruntime-extensions-android:0.9.0")
     
     // Google ML Kit - Updated to available versions
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.0")
