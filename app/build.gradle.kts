@@ -9,12 +9,12 @@ plugins {
 
 android {
     namespace = "com.aireceptionist.app"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.aireceptionist.app"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -47,12 +47,12 @@ android {
     }
     
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
     
     buildFeatures {
@@ -72,7 +72,7 @@ dependencies {
     // Core Android
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("com.google.android.material:material:1.10.0")
+    implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     
     // Lifecycle and ViewModel
@@ -129,7 +129,7 @@ dependencies {
     kapt("com.github.bumptech.glide:compiler:4.16.0")
     
     // Audio Processing
-    implementation("com.arthenica:mobile-ffmpeg-full:4.4.LTS")
+    implementation("com.arthenica:mobile-ffmpeg-audio:4.4.LTS")
     
     // ML/AI Libraries
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
@@ -141,15 +141,15 @@ dependencies {
     implementation("com.google.mlkit:text-recognition:16.0.0")
     implementation("com.google.mlkit:face-detection:16.1.5")
     
-    // Firebase (Optional for cloud features)
-    implementation(platform("com.google.firebase:firebase-bom:32.4.0"))
-    implementation("com.google.firebase:firebase-analytics-ktx")
-    implementation("com.google.firebase:firebase-firestore-ktx")
-    implementation("com.google.firebase:firebase-auth-ktx")
-    implementation("com.google.firebase:firebase-functions-ktx")
+    // Firebase (Optional for cloud features) - Commented out for initial build
+    // implementation(platform("com.google.firebase:firebase-bom:32.4.0"))
+    // implementation("com.google.firebase:firebase-analytics-ktx")
+    // implementation("com.google.firebase:firebase-firestore-ktx")
+    // implementation("com.google.firebase:firebase-auth-ktx")
+    // implementation("com.google.firebase:firebase-functions-ktx")
     
-    // WebRTC for VoIP
-    implementation("org.webrtc:google-webrtc:1.0.32006")
+    // WebRTC for VoIP (commented out due to compatibility issues)
+    // implementation("org.webrtc:google-webrtc:1.0.32006")
     
     // JWT for API authentication
     implementation("io.jsonwebtoken:jjwt-api:0.11.5")
@@ -159,7 +159,7 @@ dependencies {
     // Event Bus
     implementation("org.greenrobot:eventbus:3.3.1")
     
-    // Telephony helpers
+    // Charts
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
     
     // Testing
