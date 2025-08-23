@@ -7,6 +7,8 @@ import com.google.mlkit.nl.languageid.LanguageIdentification
 import com.google.mlkit.nl.languageid.LanguageIdentifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import javax.inject.Inject
 
 /**
@@ -96,21 +98,21 @@ class SpeechRecognitionAgent @Inject constructor(
     
     private suspend fun detectLanguage(text: String): String = withContext(Dispatchers.IO) {
         try {
-            var detectedLanguage = "en" // Default to English
-            
-            languageIdentifier.identifyLanguage(text)
-                .addOnSuccessListener { languageCode ->
-                    if (languageCode != "und") { // "und" means undetermined
-                        detectedLanguage = languageCode
-                        Logger.d(TAG, "Detected language: $languageCode")
+            val langCode = suspendCancellableCoroutine<String> { cont ->
+                val task = languageIdentifier.identifyLanguage(text)
+                task
+                    .addOnSuccessListener { languageCode ->
+                        if (!cont.isCompleted) cont.resume(languageCode)
+                        if (languageCode != "und") {
+                            Logger.d(TAG, "Detected language: $languageCode")
+                        }
                     }
-                }
-                .addOnFailureListener { e ->
-                    Logger.w(TAG, "Language detection failed", e)
-                }
-            
-            detectedLanguage
-            
+                    .addOnFailureListener { e: Exception ->
+                        Logger.w(TAG, "Language detection failed", e)
+                        if (!cont.isCompleted) cont.resume("und")
+                    }
+            }
+            if (langCode != "und") langCode else "en"
         } catch (e: Exception) {
             Logger.e(TAG, "Error in language detection", e)
             "en" // Default to English on error

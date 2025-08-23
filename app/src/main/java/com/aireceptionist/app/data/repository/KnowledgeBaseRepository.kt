@@ -78,7 +78,7 @@ class KnowledgeBaseRepository @Inject constructor(
     
     private fun calculateRelevanceScore(query: String, entry: KnowledgeBaseEntry): Float {
         val queryWords = query.toLowerCase().split("\\s+".toRegex())
-        val contentWords = (entry.title + " " + entry.content).toLowerCase().split("\\s+".toRegex())
+        (entry.title + " " + entry.content).toLowerCase().split("\\s+".toRegex())
         val tags = parseJsonArray(entry.tags)
         
         var score = 0.0f

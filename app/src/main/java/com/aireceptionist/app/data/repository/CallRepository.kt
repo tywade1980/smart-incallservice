@@ -235,6 +235,6 @@ data class CallStats(
     val averageDuration: Double = 0.0,
     val humanTransfers: Int = 0,
     val averageSatisfaction: Double = 0.0,
-    val callTypeBreakdown: List<CallTypeCount> = emptyList(),
-    val callResultBreakdown: List<CallResultCount> = emptyList()
+    val callTypeBreakdown: List<com.aireceptionist.app.data.dao.CallTypeCount> = emptyList(),
+    val callResultBreakdown: List<com.aireceptionist.app.data.dao.CallResultCount> = emptyList()
 )

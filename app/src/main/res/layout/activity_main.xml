@@ -108,7 +108,7 @@
 
                         <Button
                             android:id="@+id/buttonViewStats"
-                            style="@style/Widget.Material3.Button.TextButton"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="View Details" />
@@ -184,6 +184,7 @@
 
                 <Button
                     android:id="@+id/buttonSettings"
+                    style="@style/Widget.MaterialComponents.Button"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"

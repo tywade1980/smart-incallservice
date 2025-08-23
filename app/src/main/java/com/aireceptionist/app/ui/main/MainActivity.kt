@@ -3,7 +3,10 @@ package com.aireceptionist.app.ui.main
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
+import android.app.role.RoleManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -11,8 +14,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.aireceptionist.app.databinding.ActivityMainBinding
-import com.aireceptionist.app.ui.call.CallActivity
-import com.aireceptionist.app.ui.settings.SettingsActivity
+// import com.aireceptionist.app.ui.call.CallActivity
+// import com.aireceptionist.app.ui.settings.SettingsActivity
 import com.aireceptionist.app.ui.setup.LLMSetupActivity
 import com.aireceptionist.app.ai.llm.OnDeviceLLM
 import com.aireceptionist.app.utils.Logger
@@ -38,10 +41,35 @@ class MainActivity : AppCompatActivity() {
         val allGranted = permissions.all { it.value }
         if (allGranted) {
             Logger.i(TAG, "All permissions granted")
+            ensureDeviceRoles()
             initializeApp()
         } else {
             Logger.w(TAG, "Some permissions denied")
             showPermissionDeniedMessage()
+        }
+    }
+
+    private val requestAssistantRoleLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            Toast.makeText(this, "Set as default Assistant", Toast.LENGTH_SHORT).show()
+            Logger.i(TAG, "ROLE_ASSISTANT granted")
+        } else {
+            Logger.w(TAG, "ROLE_ASSISTANT not granted; opening settings")
+            openAssistantSettingsFallback()
+        }
+    }
+
+    private val requestDialerRoleLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            Toast.makeText(this, "Set as default Phone app", Toast.LENGTH_SHORT).show()
+            Logger.i(TAG, "ROLE_DIALER granted")
+        } else {
+            Logger.w(TAG, "ROLE_DIALER not granted; opening settings")
+            openDefaultAppsSettingsFallback()
         }
     }
     
@@ -67,10 +95,7 @@ class MainActivity : AppCompatActivity() {
         // Set up RecyclerView for call history
         callHistoryAdapter = CallHistoryAdapter { callRecord ->
             // Handle call record click
-            val intent = Intent(this, CallActivity::class.java).apply {
-                putExtra("call_id", callRecord.id)
-                putExtra("view_mode", true)
-            }
+            val intent = Intent(this, LLMSetupActivity::class.java)
             startActivity(intent)
         }
         
@@ -81,11 +106,11 @@ class MainActivity : AppCompatActivity() {
         
         // Set up click listeners
         binding.fabNewCall.setOnClickListener {
-            startActivity(Intent(this, CallActivity::class.java))
+            startActivity(Intent(this, LLMSetupActivity::class.java))
         }
         
         binding.buttonSettings.setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
+            startActivity(Intent(this, LLMSetupActivity::class.java))
         }
         
         binding.buttonViewStats.setOnClickListener {
@@ -165,28 +190,28 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun checkPermissions() {
-        val requiredPermissions = arrayOf(
+        val required = mutableListOf(
             Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.READ_PHONE_NUMBERS,
             Manifest.permission.CALL_PHONE,
             Manifest.permission.ANSWER_PHONE_CALLS,
             Manifest.permission.READ_CALL_LOG,
             Manifest.permission.WRITE_CALL_LOG,
             Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.READ_CONTACTS,
-            Manifest.permission.POST_NOTIFICATIONS,
-            Manifest.permission.BIND_INCALL_SERVICE,
-            Manifest.permission.MANAGE_OWN_CALLS
+            Manifest.permission.READ_CONTACTS
         )
-        
-        val missingPermissions = requiredPermissions.filter {
+        if (Build.VERSION.SDK_INT >= 33) {
+            required.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        val missing = required.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
-        
-        if (missingPermissions.isNotEmpty()) {
-            Logger.i(TAG, "Requesting permissions: ${missingPermissions.joinToString()}")
-            permissionLauncher.launch(missingPermissions.toTypedArray())
+        if (missing.isNotEmpty()) {
+            Logger.i(TAG, "Requesting permissions: ${missing.joinToString()}")
+            permissionLauncher.launch(missing.toTypedArray())
         } else {
             Logger.i(TAG, "All permissions already granted")
+            ensureDeviceRoles()
             initializeApp()
         }
     }
@@ -223,6 +248,50 @@ class MainActivity : AppCompatActivity() {
         Logger.i(TAG, "MainActivity destroyed")
     }
     
+    private fun ensureDeviceRoles() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(RoleManager::class.java)
+            if (roleManager != null) {
+                try {
+                    // Request to be Default Assistant (digital assistant)
+                    if (roleManager.isRoleAvailable(RoleManager.ROLE_ASSISTANT) && !roleManager.isRoleHeld(RoleManager.ROLE_ASSISTANT)) {
+                        val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT)
+                        requestAssistantRoleLauncher.launch(intent)
+                    }
+                    // Optionally request to be Default Dialer if eligible
+                    if (roleManager.isRoleAvailable(RoleManager.ROLE_DIALER) && !roleManager.isRoleHeld(RoleManager.ROLE_DIALER)) {
+                        val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
+                        requestDialerRoleLauncher.launch(intent)
+                    }
+                } catch (e: Exception) {
+                    Logger.w(TAG, "Role request failed, opening settings", e)
+                    openDefaultAppsSettingsFallback()
+                }
+            }
+        }
+    }
+
+    private fun openAssistantSettingsFallback() {
+        // Try voice input settings first, then default apps
+        try {
+            startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
+        } catch (_: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+            } catch (e: Exception) {
+                Logger.e(TAG, "Unable to open assistant settings", e)
+            }
+        }
+    }
+
+    private fun openDefaultAppsSettingsFallback() {
+        try {
+            startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+        } catch (e: Exception) {
+            Logger.e(TAG, "Unable to open default apps settings", e)
+        }
+    }
+
     companion object {
         private const val TAG = "MainActivity"
     }

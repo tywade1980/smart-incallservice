@@ -73,7 +73,11 @@ class AIConnectionService : ConnectionService() {
                                    CAPABILITY_SUPPORTS_VT_REMOTE_TX
             
             audioModeIsVoip = true
-            callerDisplayName = "AI Receptionist"
+            try {
+                setCallerDisplayName("AI Receptionist", TelecomManager.PRESENTATION_ALLOWED)
+            } catch (_: Exception) {
+                // Fallback if API not available
+            }
             
             Logger.d(TAG, "AIConnection initialized for: $address (outgoing: $isOutgoing)")
         }

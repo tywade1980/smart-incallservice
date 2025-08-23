@@ -63,15 +63,15 @@ class CallHistoryAdapter(
                     iconCall.setColorFilter(getColor(R.color.green_500))
                 }
                 CallType.OUTGOING -> {
-                    iconCall.setImageResource(R.drawable.ic_call_made)
+                    iconCall.setImageResource(R.drawable.ic_phone)
                     iconCall.setColorFilter(getColor(R.color.blue_500))
                 }
                 CallType.INTERNAL -> {
-                    iconCall.setImageResource(R.drawable.ic_call)
+                    iconCall.setImageResource(R.drawable.ic_phone)
                     iconCall.setColorFilter(getColor(R.color.orange_500))
                 }
                 CallType.CONFERENCE -> {
-                    iconCall.setImageResource(R.drawable.ic_group_call)
+                    iconCall.setImageResource(R.drawable.ic_phone)
                     iconCall.setColorFilter(getColor(R.color.purple_500))
                 }
             }
@@ -79,34 +79,34 @@ class CallHistoryAdapter(
             // Set call result
             textCallResult.text = getCallResultText(callRecord.callResult)
             
-            // Set result icon and color
+            // Set result icon and color (use available drawables)
             when (callRecord.callResult) {
                 CallResult.COMPLETED -> {
                     iconResult.setImageResource(R.drawable.ic_check_circle)
                     iconResult.setColorFilter(getColor(R.color.green_500))
                 }
                 CallResult.TRANSFERRED_TO_HUMAN -> {
-                    iconResult.setImageResource(R.drawable.ic_person)
+                    iconResult.setImageResource(R.drawable.ic_settings)
                     iconResult.setColorFilter(getColor(R.color.orange_500))
                 }
                 CallResult.DROPPED -> {
-                    iconResult.setImageResource(R.drawable.ic_call_end)
+                    iconResult.setImageResource(R.drawable.ic_circle)
                     iconResult.setColorFilter(getColor(R.color.red_500))
                 }
                 CallResult.BUSY -> {
-                    iconResult.setImageResource(R.drawable.ic_busy)
+                    iconResult.setImageResource(R.drawable.ic_circle)
                     iconResult.setColorFilter(getColor(R.color.yellow_700))
                 }
                 CallResult.NO_ANSWER -> {
-                    iconResult.setImageResource(R.drawable.ic_no_answer)
+                    iconResult.setImageResource(R.drawable.ic_circle)
                     iconResult.setColorFilter(getColor(R.color.grey_500))
                 }
                 CallResult.FAILED -> {
-                    iconResult.setImageResource(R.drawable.ic_error)
+                    iconResult.setImageResource(R.drawable.ic_circle)
                     iconResult.setColorFilter(getColor(R.color.red_500))
                 }
                 CallResult.VOICEMAIL -> {
-                    iconResult.setImageResource(R.drawable.ic_voicemail)
+                    iconResult.setImageResource(R.drawable.ic_circle)
                     iconResult.setColorFilter(getColor(R.color.blue_500))
                 }
             }

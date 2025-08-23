@@ -16,7 +16,7 @@ import javax.inject.Inject
  * Agent responsible for natural language understanding and intent recognition
  */
 class NaturalLanguageAgent @Inject constructor(
-    private val onDeviceLLM: OnDeviceLLM? = null
+    private val onDeviceLLM: OnDeviceLLM
 ) : Agent {
     
     override val agentId = "natural_language"
@@ -69,7 +69,6 @@ class NaturalLanguageAgent @Inject constructor(
             // For now, we'll use rule-based approach as fallback
             
             isInitialized = true
-            Logger.i(TAG, "Natural Language Agent initialized successfully")
             true
             
         } catch (e: Exception) {
@@ -94,7 +93,7 @@ class NaturalLanguageAgent @Inject constructor(
             Logger.d(TAG, "Processing text input: ${input.content}")
             
             // Try LLM-powered understanding first (if available)
-            if (onDeviceLLM?.isReady() == true) {
+            if (onDeviceLLM.isReady()) {
                 return processWithLLM(input)
             }
             
@@ -140,10 +139,10 @@ class NaturalLanguageAgent @Inject constructor(
             Logger.d(TAG, "Processing with on-device LLM: ${input.content}")
             
             // Build context for LLM understanding
-            val context = buildLLMContext(input)
+            buildLLMContext(input)
             
             // Generate intelligent analysis using LLM
-            val analysisPrompt = \"\"\"
+            val analysisPrompt = """
                 Analyze this customer message for intent, entities, and sentiment:
                 
                 Message: "${input.content}"
@@ -155,11 +154,10 @@ class NaturalLanguageAgent @Inject constructor(
                 Sentiment: [positive/negative/neutral]
                 Confidence: [0.0-1.0]
                 Next_Action: [suggested_next_step]
-            \"\"\".trimIndent()
+            """.trimIndent()
             
-            val llmResponse = onDeviceLLM!!.generateResponse(
-                prompt = analysisPrompt,
-                context = context
+            val llmResponse = onDeviceLLM.generateResponse(
+                prompt = analysisPrompt
             )
             
             // Parse LLM response to extract structured information
@@ -167,7 +165,7 @@ class NaturalLanguageAgent @Inject constructor(
             
             AgentResponse(
                 agentId = agentId,
-                responseType = ResponseType.ANALYSIS_RESULT,
+                responseType = ResponseType.TEXT_RESPONSE,
                 content = llmResponse,
                 confidence = parsedAnalysis["confidence"] as? Float ?: 0.8f,
                 actions = createActionsFromLLMAnalysis(parsedAnalysis),
@@ -185,7 +183,7 @@ class NaturalLanguageAgent @Inject constructor(
             // Fallback to traditional methods
             val intent = extractIntent(input.content)
             val entities = extractEntities(input.content)
-            val sentiment = analyzeSentiment(input.content)
+            analyzeSentiment(input.content)
             
             AgentResponse(
                 agentId = agentId,
@@ -195,7 +193,7 @@ class NaturalLanguageAgent @Inject constructor(
                 actions = createActionsForIntent(intent, entities),
                 nextSuggestedAgent = determineNextAgent(intent),
                 metadata = mapOf(
-                    "fallback_reason" to e.message,
+                    "fallback_reason" to (e.message ?: ""),
                     "processing_method" to "traditional_nlp"
                 )
             )
@@ -247,7 +245,7 @@ class NaturalLanguageAgent @Inject constructor(
                 line.startsWith("Next_Action:", ignoreCase = true) -> {
                     val action = line.substringAfter(":").trim()
                     analysis["next_action"] = action
-                    analysis["next_agent"] = mapActionToAgent(action)
+                    analysis["next_agent"] = mapActionToAgent(action) ?: ""
                 }
             }
         }
@@ -266,24 +264,23 @@ class NaturalLanguageAgent @Inject constructor(
         
         when {
             intent.contains("appointment", ignoreCase = true) -> {
-                actions.add(AgentAction.SCHEDULE_APPOINTMENT)
-                actions.add(AgentAction.CHECK_CALENDAR)
+                actions.add(AgentAction(ActionType.SCHEDULE_APPOINTMENT, emptyMap()))
+                actions.add(AgentAction(ActionType.UPDATE_DATABASE, emptyMap()))
             }
             intent.contains("information", ignoreCase = true) -> {
-                actions.add(AgentAction.PROVIDE_INFORMATION)
-                actions.add(AgentAction.SEARCH_KNOWLEDGE_BASE)
+                actions.add(AgentAction(ActionType.PLAY_AUDIO, emptyMap()))
             }
             intent.contains("transfer", ignoreCase = true) || intent.contains("routing", ignoreCase = true) -> {
-                actions.add(AgentAction.ROUTE_CALL)
-                actions.add(AgentAction.CHECK_AVAILABILITY)
+                actions.add(AgentAction(ActionType.TRANSFER_CALL, emptyMap()))
             }
             nextAction.contains("escalate", ignoreCase = true) -> {
-                actions.add(AgentAction.ESCALATE_TO_HUMAN)
+                actions.add(AgentAction(ActionType.REQUEST_HUMAN_OPERATOR, emptyMap()))
             }
         }
         
+        // If no specific actions determined, return empty list
         if (actions.isEmpty()) {
-            actions.add(AgentAction.CONTINUE_CONVERSATION)
+            return actions
         }
         
         return actions

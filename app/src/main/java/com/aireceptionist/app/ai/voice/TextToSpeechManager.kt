@@ -17,7 +17,7 @@ import kotlin.coroutines.resume
  */
 @Singleton
 class TextToSpeechManager @Inject constructor(
-    private val context: Context
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context
 ) {
     
     private var textToSpeech: TextToSpeech? = null
@@ -82,7 +82,7 @@ class TextToSpeechManager @Inject constructor(
             
             // Set language
             val locale = getLocaleFromLanguage(language)
-            textToSpeech?.setLanguage(locale)
+            textToSpeech?.language = locale
             
             // Apply voice style
             applyVoiceStyle(voiceStyle)

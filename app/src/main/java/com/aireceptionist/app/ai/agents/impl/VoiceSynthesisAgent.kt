@@ -26,12 +26,15 @@ class VoiceSynthesisAgent @Inject constructor(
     
     override suspend fun initialize(): Boolean = withContext(Dispatchers.IO) {
         try {
+            if (isInitialized) {
+                Logger.d(TAG, "Already initialized")
+                return@withContext true
+            }
             Logger.i(TAG, "Initializing Voice Synthesis Agent")
             
             ttsManager.initialize()
             
             isInitialized = true
-            Logger.i(TAG, "Voice Synthesis Agent initialized successfully")
             true
             
         } catch (e: Exception) {
@@ -77,13 +80,13 @@ class VoiceSynthesisAgent @Inject constructor(
                         AgentAction(
                             actionType = ActionType.PLAY_AUDIO,
                             parameters = mapOf(
-                                "audio_file" to audioResult.audioFile,
+                                "audio_file" to (audioResult.audioFile ?: ""),
                                 "duration" to audioResult.duration
                             )
                         )
                     ),
                     metadata = mapOf(
-                        "audio_file" to audioResult.audioFile,
+                        "audio_file" to (audioResult.audioFile ?: ""),
                         "language" to language,
                         "voice_style" to voiceStyle,
                         "duration" to audioResult.duration

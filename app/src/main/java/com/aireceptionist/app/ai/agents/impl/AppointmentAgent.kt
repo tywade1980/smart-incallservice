@@ -60,7 +60,7 @@ class AppointmentAgent @Inject constructor(
             Logger.d(TAG, "Processing appointment request: ${input.content}")
             
             val intent = input.context.intent ?: "appointment_booking"
-            val entities = input.metadata["entities"] as? List<*> ?: emptyList<Any>()
+            val entities: List<Any> = (input.metadata["entities"] as? List<*>)?.filterNotNull()?.map { it as Any } ?: emptyList()
             
             when (intent) {
                 "appointment_booking" -> handleBookingRequest(input, entities)
@@ -98,15 +98,15 @@ class AppointmentAgent @Inject constructor(
                         AgentAction(
                             actionType = ActionType.SEND_SMS,
                             parameters = mapOf(
-                                "phone" to input.context.callerNumber,
-                                "message" to "Appointment confirmed: ${formatAppointmentDetails(appointmentDetails)}"
+                                "phone" to (input.context.callerNumber ?: ""),
+                                "message" to ("Appointment confirmed: ${formatAppointmentDetails(appointmentDetails)}" as Any)
                             )
                         )
                     ),
                     nextSuggestedAgent = "voice_synthesis",
                     metadata = mapOf(
-                        "appointment_id" to bookingResult.appointmentId,
-                        "booking_status" to "confirmed"
+                        "appointment_id" to (bookingResult.appointmentId ?: "" as Any),
+                        "booking_status" to ("confirmed" as Any)
                     )
                 )
             } else {
@@ -117,9 +117,9 @@ class AppointmentAgent @Inject constructor(
                     confidence = 0.8f,
                     nextSuggestedAgent = "voice_synthesis",
                     metadata = mapOf(
-                        "booking_status" to "failed",
-                        "reason" to bookingResult.reason,
-                        "alternatives" to bookingResult.alternativeSlots
+                        "booking_status" to ("failed" as Any),
+                        "reason" to (bookingResult.reason ?: "" as Any),
+                        "alternatives" to (bookingResult.alternativeSlots as Any)
                     )
                 )
             }

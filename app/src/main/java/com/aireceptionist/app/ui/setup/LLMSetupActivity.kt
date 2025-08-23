@@ -1,5 +1,6 @@
 package com.aireceptionist.app.ui.setup
 
+import android.content.Context
 import android.os.Bundle
 import android.view.View
 import androidx.activity.viewModels
@@ -81,7 +82,7 @@ class LLMSetupActivity : AppCompatActivity() {
     private fun checkModelStatus() {
         lifecycleScope.launch {
             val isAvailable = modelDownloader.isModelAvailable()
-            val modelInfo = modelDownloader.getModelInfo()
+            modelDownloader.getModelInfo()
             
             if (isAvailable) {
                 // Model already downloaded, try to initialize
@@ -108,15 +109,18 @@ class LLMSetupActivity : AppCompatActivity() {
         val connectionAdvice = NetworkHelper.getDownloadAdvice(this)
         
         if (!hasInternet) {
-            androidx.appcompat.app.AlertDialog.Builder(this)
+            val noInternetDialog = androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("No Internet Connection")
                 .setMessage("Internet connection is required to download the AI model from Hugging Face. Please connect to WiFi or mobile data and try again.")
                 .setPositiveButton("OK", null)
-                .show()
+                .create()
+            noInternetDialog.show()
+            noInternetDialog.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            noInternetDialog.window?.setDimAmount(0f)
             return
         }
         
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        val downloadDialog = androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("🧠 Download Real AI Brain")
             .setMessage(
                 "Download Microsoft Phi-3.5-mini (~2.3GB) from Hugging Face\n\n" +
@@ -131,7 +135,10 @@ class LLMSetupActivity : AppCompatActivity() {
                 checkHuggingFaceAndDownload()
             }
             .setNegativeButton("Cancel", null)
-            .show()
+            .create()
+        downloadDialog.show()
+        downloadDialog.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+        downloadDialog.window?.setDimAmount(0f)
     }
     
     private fun checkHuggingFaceAndDownload() {
@@ -144,59 +151,75 @@ class LLMSetupActivity : AppCompatActivity() {
                 downloadModel()
             } else {
                 binding.progressBar.visibility = View.GONE
-                androidx.appcompat.app.AlertDialog.Builder(this@LLMSetupActivity)
+                val connDialog = androidx.appcompat.app.AlertDialog.Builder(this@LLMSetupActivity)
                     .setTitle("Connection Issue")
                     .setMessage("Cannot reach Hugging Face servers. This might be due to:\n\n• Temporary server issues\n• Network restrictions\n• Firewall settings\n\nTry again in a few minutes or check your network connection.")
                     .setPositiveButton("Retry") { _, _ ->
                         checkHuggingFaceAndDownload()
                     }
                     .setNegativeButton("Cancel", null)
-                    .show()
+                    .create()
+                connDialog.show()
+                connDialog.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                connDialog.window?.setDimAmount(0f)
             }
         }
     }
     
+    private var downloadReceiver: com.aireceptionist.app.ai.llm.ModelDownloadReceiver? = null
+
     private fun downloadModel() {
         binding.apply {
             btnDownloadModel.isEnabled = false
             btnSkipSetup.isEnabled = false
             progressBar.visibility = View.VISIBLE
             tvStatus.text = "Connecting to Hugging Face..."
-            
+
             // Show download info
             tvDownloadInfo.visibility = View.VISIBLE
             tvDownloadInfo.text = "Downloading from: huggingface.co/microsoft/Phi-3.5-mini-instruct-onnx"
         }
-        
-        lifecycleScope.launch {
-            modelDownloader.downloadModel().collect { progress ->
-                viewModel.setDownloadProgress(progress)
-                
-                when {
-                    progress.isComplete -> {
-                        // Download complete, initialize LLM
-                        binding.apply {
-                            tvStatus.text = "Download complete! Initializing AI brain..."
-                            tvDownloadInfo.text = "Verifying model integrity and starting AI system..."
-                        }
-                        
-                        val initialized = onDeviceLLM.initialize()
-                        if (initialized) {
-                            viewModel.setSetupState(LLMSetupState.READY)
-                        } else {
-                            viewModel.setSetupState(LLMSetupState.ERROR("Failed to initialize after download"))
-                        }
-                    }
-                    progress.error != null -> {
-                        viewModel.setSetupState(LLMSetupState.ERROR(progress.error))
-                    }
-                    else -> {
-                        // Update download status
-                        binding.tvStatus.text = "Downloading ${progress.fileName}..."
+
+        viewModel.setSetupState(LLMSetupState.DOWNLOADING)
+
+        // Enqueue with DownloadManager and register a dynamic BroadcastReceiver
+        val helper = com.aireceptionist.app.ai.llm.DownloadManagerHelper(this)
+        val enqueued = helper.enqueue()
+
+        downloadReceiver = com.aireceptionist.app.ai.llm.ModelDownloadReceiver(
+            onAllFilesTransferred = { ctx ->
+                // After files are moved to internal storage, initialize LLM
+                lifecycleScope.launch {
+                    binding.tvStatus.text = "Download complete! Initializing AI brain..."
+                    binding.tvDownloadInfo.text = "Verifying model and starting AI system..."
+                    val initialized = onDeviceLLM.initialize()
+                    if (initialized) {
+                        viewModel.setSetupState(LLMSetupState.READY)
+                    } else {
+                        viewModel.setSetupState(LLMSetupState.ERROR("Failed to initialize after download"))
                     }
                 }
             }
+        ).apply {
+            expectedIds.add(enqueued.modelId)
+            expectedIds.add(enqueued.tokenizerId)
         }
+
+        registerReceiver(
+            downloadReceiver,
+            android.content.IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            Context.RECEIVER_NOT_EXPORTED
+        )
+
+        // Basic UI updates while DM handles progress internally; for full progress, implement polling.
+        binding.tvStatus.text = "Download started via Android DownloadManager..."
+        binding.tvDownloadInfo.text = "You can leave the app; download will continue in background."
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        downloadReceiver?.let { runCatching { unregisterReceiver(it) } }
+        downloadReceiver = null
     }
     
     private fun testLLM() {

@@ -7,6 +7,10 @@ import android.speech.RecognizerIntent
 import android.content.Intent
 import android.os.Bundle
 import com.aireceptionist.app.utils.Logger
+import android.os.Handler
+import android.os.Looper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import java.util.*
@@ -18,7 +22,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class VoiceProcessor @Inject constructor(
-    private val context: Context
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context
 ) {
     
     private var speechRecognizer: SpeechRecognizer? = null
@@ -28,13 +32,15 @@ class VoiceProcessor @Inject constructor(
         try {
             Logger.i(TAG, "Initializing VoiceProcessor")
             
-            if (SpeechRecognizer.isRecognitionAvailable(context)) {
-                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
-                isInitialized = true
-                Logger.i(TAG, "VoiceProcessor initialized successfully")
-            } else {
-                Logger.e(TAG, "Speech recognition not available on this device")
-                throw IllegalStateException("Speech recognition not available")
+            withContext(Dispatchers.Main) {
+                if (SpeechRecognizer.isRecognitionAvailable(context)) {
+                    speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+                    isInitialized = true
+                    Logger.i(TAG, "VoiceProcessor initialized successfully")
+                } else {
+                    Logger.e(TAG, "Speech recognition not available on this device")
+                    throw IllegalStateException("Speech recognition not available")
+                }
             }
             
         } catch (e: Exception) {
@@ -56,60 +62,77 @@ class VoiceProcessor @Inject constructor(
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
             }
-            
-            speechRecognizer?.setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {
-                    Logger.d(TAG, "Ready for speech")
-                }
-                
-                override fun onBeginningOfSpeech() {
-                    Logger.d(TAG, "Beginning of speech")
-                }
-                
-                override fun onRmsChanged(rmsdB: Float) {
-                    // RMS changed - could be used for volume monitoring
-                }
-                
-                override fun onBufferReceived(buffer: ByteArray?) {
-                    // Audio buffer received
-                }
-                
-                override fun onEndOfSpeech() {
-                    Logger.d(TAG, "End of speech")
-                }
-                
-                override fun onError(error: Int) {
-                    val errorMessage = getErrorMessage(error)
-                    Logger.e(TAG, "Speech recognition error: $errorMessage")
+
+            val mainHandler = Handler(Looper.getMainLooper())
+
+            mainHandler.post {
+                try {
+                    speechRecognizer?.setRecognitionListener(object : RecognitionListener {
+                        override fun onReadyForSpeech(params: Bundle?) {
+                            Logger.d(TAG, "Ready for speech")
+                        }
+                        
+                        override fun onBeginningOfSpeech() {
+                            Logger.d(TAG, "Beginning of speech")
+                        }
+                        
+                        override fun onRmsChanged(rmsdB: Float) {
+                            // RMS changed - could be used for volume monitoring
+                        }
+                        
+                        override fun onBufferReceived(buffer: ByteArray?) {
+                            // Audio buffer received
+                        }
+                        
+                        override fun onEndOfSpeech() {
+                            Logger.d(TAG, "End of speech")
+                        }
+                        
+                        override fun onError(error: Int) {
+                            val errorMessage = getErrorMessage(error)
+                            Logger.e(TAG, "Speech recognition error: $errorMessage")
+                            if (continuation.isActive) {
+                                continuation.resume("")
+                            }
+                        }
+                        
+                        override fun onResults(results: Bundle?) {
+                            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                            val recognizedText = matches?.firstOrNull() ?: ""
+                            
+                            Logger.d(TAG, "Speech recognition result: $recognizedText")
+                            
+                            if (continuation.isActive) {
+                                continuation.resume(recognizedText)
+                            }
+                        }
+                        
+                        override fun onPartialResults(partialResults: Bundle?) {
+                            // Partial results - could be used for real-time feedback
+                        }
+                        
+                        override fun onEvent(eventType: Int, params: Bundle?) {
+                            // Speech recognition event
+                        }
+                    })
+
+                    speechRecognizer?.startListening(intent)
+                } catch (e: Exception) {
+                    Logger.e(TAG, "Error starting speech recognition", e)
                     if (continuation.isActive) {
                         continuation.resume("")
                     }
                 }
-                
-                override fun onResults(results: Bundle?) {
-                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    val recognizedText = matches?.firstOrNull() ?: ""
-                    
-                    Logger.d(TAG, "Speech recognition result: $recognizedText")
-                    
-                    if (continuation.isActive) {
-                        continuation.resume(recognizedText)
-                    }
-                }
-                
-                override fun onPartialResults(partialResults: Bundle?) {
-                    // Partial results - could be used for real-time feedback
-                }
-                
-                override fun onEvent(eventType: Int, params: Bundle?) {
-                    // Speech recognition event
-                }
-            })
-            
-            speechRecognizer?.startListening(intent)
+            }
             
             continuation.invokeOnCancellation {
-                speechRecognizer?.stopListening()
+                mainHandler.post {
+                    try {
+                        speechRecognizer?.stopListening()
+                    } catch (e: Exception) {
+                        Logger.w(TAG, "Error stopping SpeechRecognizer on cancel", e)
+                    }
+                }
             }
             
         } catch (e: Exception) {
@@ -142,9 +165,17 @@ class VoiceProcessor @Inject constructor(
     suspend fun shutdown() {
         try {
             Logger.i(TAG, "Shutting down VoiceProcessor")
-            speechRecognizer?.destroy()
-            speechRecognizer = null
-            isInitialized = false
+            withContext(Dispatchers.Main) {
+                try {
+                    // Best effort to stop if listening
+                    try { speechRecognizer?.stopListening() } catch (_: Exception) {}
+                    speechRecognizer?.destroy()
+                    speechRecognizer = null
+                    isInitialized = false
+                } catch (e: Exception) {
+                    Logger.w(TAG, "Error while destroying SpeechRecognizer on main thread", e)
+                }
+            }
             Logger.i(TAG, "VoiceProcessor shutdown complete")
         } catch (e: Exception) {
             Logger.e(TAG, "Error during VoiceProcessor shutdown", e)

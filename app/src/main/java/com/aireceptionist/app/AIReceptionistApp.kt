@@ -11,6 +11,9 @@ import com.aireceptionist.app.ai.agents.AgentManager
 import com.aireceptionist.app.data.database.AIDatabase
 import com.aireceptionist.app.utils.Logger
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -44,7 +47,7 @@ class AIReceptionistApp : Application(), Configuration.Provider {
 
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
             
             // Call notifications channel
             val callChannel = NotificationChannel(
@@ -85,22 +88,33 @@ class AIReceptionistApp : Application(), Configuration.Provider {
 
     private fun initializeAI() {
         try {
-            agentManager.initialize()
-            Logger.i("AIReceptionistApp", "AI agents initialized successfully")
+            GlobalScope.launch(Dispatchers.Default) {
+                try {
+                    agentManager.initialize()
+                    Logger.i("AIReceptionistApp", "AI agents initialized successfully")
+                } catch (e: Exception) {
+                    Logger.e("AIReceptionistApp", "Failed to initialize AI agents", e)
+                }
+            }
         } catch (e: Exception) {
-            Logger.e("AIReceptionistApp", "Failed to initialize AI agents", e)
+            Logger.e("AIReceptionistApp", "Failed to start AI initialization", e)
         }
     }
 
-    override fun getWorkManagerConfiguration(): Configuration {
-        return Configuration.Builder()
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
             .setMinimumLoggingLevel(android.util.Log.INFO)
             .build()
-    }
 
     override fun onTerminate() {
         super.onTerminate()
-        agentManager.shutdown()
+        GlobalScope.launch(Dispatchers.Default) {
+            try {
+                agentManager.shutdown()
+            } catch (e: Exception) {
+                Logger.e("AIReceptionistApp", "Error during shutdown", e)
+            }
+        }
         Logger.d("AIReceptionistApp", "Application terminated")
     }
 }

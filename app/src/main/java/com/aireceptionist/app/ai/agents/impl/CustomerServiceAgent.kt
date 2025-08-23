@@ -58,7 +58,7 @@ class CustomerServiceAgent @Inject constructor(
             Logger.d(TAG, "Processing customer query: ${input.content}")
             
             val intent = input.context.intent ?: "general_inquiry"
-            val entities = input.metadata["entities"] as? List<*> ?: emptyList<Any>()
+            input.metadata["entities"] as? List<*> ?: emptyList<Any>()
             
             // Search knowledge base for relevant information
             val knowledgeResults = searchKnowledgeBase(input.content, intent)
@@ -158,7 +158,7 @@ class CustomerServiceAgent @Inject constructor(
     
     private fun shouldEscalateToHuman(
         intent: String,
-        context: com.aireceptistent.app.data.models.CallContext,
+        context: com.aireceptionist.app.data.models.CallContext,
         knowledgeResults: List<KnowledgeResult>
     ): Boolean {
         
@@ -197,11 +197,7 @@ class CustomerServiceAgent @Inject constructor(
         
         // Escalate if sentiment is very negative
         val sentiment = context.sentiment
-        if (sentiment == "very_negative" || sentiment == "angry") {
-            return true
-        }
-        
-        return false
+        return sentiment == "very_negative" || sentiment == "angry"
     }
     
     override suspend fun shutdown() {

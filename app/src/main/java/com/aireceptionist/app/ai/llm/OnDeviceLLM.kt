@@ -7,8 +7,10 @@ import ai.onnxruntime.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.io.File
 import java.nio.ByteBuffer
 import java.nio.FloatBuffer
+import java.nio.IntBuffer
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,7 +31,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class OnDeviceLLM @Inject constructor(
-    private val context: Context
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context
 ) {
     companion object {
         private const val TAG = "OnDeviceLLM"
@@ -65,17 +67,24 @@ Keep responses concise, professional, and helpful. Always maintain a friendly to
     suspend fun initialize(): Boolean = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Initializing On-Device LLM...")
-            
+
             // Initialize ONNX Runtime environment
             ortEnvironment = OrtEnvironment.getEnvironment()
-            
-            // Load model from internal storage (downloaded by ModelDownloader)
-            val modelBytes = loadModelFromStorage()
-            if (modelBytes == null) {
-                Log.e(TAG, "Failed to load model from storage. Please download the model first.")
+
+            // Resolve model file path in internal storage
+            val modelsDir = java.io.File(context.filesDir, "models")
+            val modelFile = java.io.File(modelsDir, MODEL_FILENAME)
+            if (!modelFile.exists()) {
+                Log.e(TAG, "Model file not found at: ${modelFile.absolutePath}")
+                Log.i(TAG, "Please download the Phi-3.5-mini model first")
                 return@withContext false
             }
-            
+            if (modelFile.length() < 1024L * 1024 * 1000) {
+                Log.e(TAG, "Model file seems too small: ${modelFile.length()} bytes")
+                return@withContext false
+            }
+            Log.i(TAG, "Loading ONNX model from path: ${modelFile.absolutePath} (${modelFile.length() / (1024*1024)}MB)")
+
             // Create session options for mobile optimization
             val sessionOptions = OrtSession.SessionOptions().apply {
                 // Use CPU provider for better compatibility
@@ -85,13 +94,13 @@ Keep responses concise, professional, and helpful. Always maintain a friendly to
                 setIntraOpNumThreads(2) // Limit threads for mobile
                 setMemoryPatternOptimization(true)
             }
-            
-            // Create ONNX session
-            ortSession = ortEnvironment?.createSession(modelBytes, sessionOptions)
-            
+
+            // Create ONNX session from file path (avoids loading entire model into heap)
+            ortSession = ortEnvironment?.createSession(modelFile.absolutePath, sessionOptions)
+
             isInitialized = ortSession != null
             Log.d(TAG, "LLM initialization ${if (isInitialized) "successful" else "failed"}")
-            
+
             return@withContext isInitialized
         } catch (e: Exception) {
             Log.e(TAG, "Error initializing LLM", e)
@@ -181,32 +190,10 @@ Respond with appropriate emotional intelligence and empathy.
     /**
      * Load model from internal storage (downloaded by ModelDownloader)
      */
+    // Deprecated in favor of path-based loading to avoid OOM on large models.
+    @Deprecated("Use createSession(modelFile.absolutePath) with path-based loading")
     private fun loadModelFromStorage(): ByteArray? {
-        return try {
-            val modelsDir = File(context.filesDir, "models")
-            val modelFile = File(modelsDir, MODEL_FILENAME)
-            
-            if (!modelFile.exists()) {
-                Log.e(TAG, "Model file not found at: ${modelFile.absolutePath}")
-                Log.i(TAG, "Please run ModelDownloader first to download the Phi-3.5-mini model")
-                return null
-            }
-            
-            if (modelFile.length() < 1024 * 1024 * 1000) { // Less than 1GB is suspicious
-                Log.e(TAG, "Model file seems too small: ${modelFile.length()} bytes")
-                return null
-            }
-            
-            Log.i(TAG, "Loading ONNX model from: ${modelFile.absolutePath} (${modelFile.length() / (1024*1024)}MB)")
-            modelFile.readBytes()
-            
-        } catch (e: IOException) {
-            Log.e(TAG, "Error loading model from storage", e)
-            null
-        } catch (e: OutOfMemoryError) {
-            Log.e(TAG, "Out of memory loading model - model may be too large", e)
-            null
-        }
+        return null
     }
 
     /**
@@ -228,7 +215,7 @@ Respond with appropriate emotional intelligence and empathy.
                 "vocab_size" to 32064,
                 "model_type" to "phi3",
                 "tokenizer_path" to tokenizerFile.absolutePath,
-                "config_path" to if (configFile.exists()) configFile.absolutePath else null
+                "config_path" to (if (configFile.exists()) configFile.absolutePath else "")
             )
             
         } catch (e: Exception) {

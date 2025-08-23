@@ -100,3 +100,11 @@ training_data/
 *.bak
 *.tar.gz
 *.zip
+
+# Temp/SQLite/Kotlin compiler heartbeat files
+# SQLite temp directory at repo root
+.sqlite-tmp/
+# Kotlin compiler daemon liveness files (anywhere)
+**/kotlin-compiler-in-*.alive
+# Fallback: ignore any .alive files
+*.alive

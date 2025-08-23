@@ -9,23 +9,18 @@ plugins {
 
 android {
     namespace = "com.aireceptionist.app"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.aireceptionist.app"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
-        // Room schema export directory
-        kapt {
-            arguments {
-                arg("room.schemaLocation", "$projectDir/schemas")
-            }
-        }
+        // Room schema export directory (configured in top-level kapt block below)
         
         buildConfigField("String", "API_BASE_URL", "\"https://api.aireceptionist.com\"")
         buildConfigField("boolean", "DEBUG_MODE", "true")
@@ -39,10 +34,18 @@ android {
                 "proguard-rules.pro"
             )
             buildConfigField("boolean", "DEBUG_MODE", "false")
+            // Ensure native libraries are stripped in release builds
+            ndk {
+                debugSymbolLevel = "NONE"
+            }
         }
         debug {
             isDebuggable = true
             applicationIdSuffix = ".debug"
+            // Keep symbols in debug for better debugging experience
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
         }
     }
     
@@ -65,7 +68,17 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        jniLibs {
+            // Ensure AGP attempts to strip JNI libraries by default
+            keepDebugSymbols.clear()
+            useLegacyPackaging = false
+        }
     }
+}
+
+// Ensure Kotlin and AGP use a JDK 17 toolchain that includes jlink
+kotlin {
+    jvmToolchain(17)
 }
 
 dependencies {
@@ -134,10 +147,10 @@ dependencies {
     // On-Device LLM - ONNX Runtime for Phi-3.5-mini model (updated to latest)
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.22.0")
     
-    // TensorFlow Lite for additional ML tasks (updated to latest)
-    implementation("org.tensorflow:tensorflow-lite:2.17.0")
-    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.17.0")
-    implementation("org.tensorflow:tensorflow-lite-gpu:2.17.0")
+    // TensorFlow Lite for additional ML tasks (use versions available on Maven Central)
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.16.1")
     
     // ONNX Runtime Extensions for tokenization and text processing
     // Note: Updated to use the correct Maven Central coordinates and latest version
@@ -145,6 +158,8 @@ dependencies {
     
     // Google ML Kit - Updated to latest version
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
+    // ML Kit Language Identification used by SpeechRecognitionAgent
+    implementation("com.google.mlkit:language-id:17.0.6")
     // Speech recognition will be handled by SpeechRecognizer (built into Android)
     // Face detection commented out for now
     // implementation("com.google.mlkit:face-detection:16.1.5")
@@ -177,4 +192,59 @@ dependencies {
     androidTestImplementation("androidx.room:room-testing:$roomVersion")
     testImplementation("org.mockito:mockito-core:5.5.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
+}
+
+// --- Alias tasks to avoid ambiguity when tools expect ':app:compileJava' ---
+// These map to the Android variant-specific Java compile tasks.
+tasks.register("compileJava") {
+    // Default to Debug variant; adjust if your CI expects Release
+    dependsOn("compileDebugJavaWithJavac")
+}
+
+tasks.register("compileReleaseJava") {
+    dependsOn("compileReleaseJavaWithJavac")
+}
+
+
+// Top-level Kapt configuration for Room
+kapt {
+    arguments {
+        arg("room.schemaLocation", "$projectDir/schemas")
+        arg("room.incremental", "true")
+        arg("room.expandProjection", "true")
+    }
+}
+
+// Ensure sqlite-jdbc used by Room verifier writes to a writable temp dir (Windows-safe)
+val sqliteTmpDir = File(buildDir, "tmp/sqlite")
+
+tasks.register("prepareSqliteTmpDir") {
+    doLast {
+        if (!sqliteTmpDir.exists()) {
+            sqliteTmpDir.mkdirs()
+        }
+    }
+}
+
+// Pass JVM args to Kapt worker so sqlite-jdbc uses our temp dir
+@Suppress("UnstableApiUsage")
+tasks.withType(org.jetbrains.kotlin.gradle.internal.KaptWithoutKotlincTask::class.java).configureEach {
+    dependsOn("prepareSqliteTmpDir")
+    kaptProcessJvmArgs.add("-Dorg.sqlite.tmpdir=${sqliteTmpDir.absolutePath}")
+    kaptProcessJvmArgs.add("-Djava.io.tmpdir=${sqliteTmpDir.absolutePath}")
+}
+
+// Workaround for Kotlin compiler expecting '.sqlite-tmp' under the module directory
+val moduleKotlinCompilerFlagDir = File(projectDir, ".sqlite-tmp")
+// Create at configuration time to avoid early access failures by Kotlin
+if (!moduleKotlinCompilerFlagDir.exists()) {
+    moduleKotlinCompilerFlagDir.mkdirs()
+}
+
+tasks.matching { it.name.startsWith("compile") && it.name.contains("Kotlin") }.configureEach {
+    doFirst {
+        if (!moduleKotlinCompilerFlagDir.exists()) {
+            moduleKotlinCompilerFlagDir.mkdirs()
+        }
+    }
 }

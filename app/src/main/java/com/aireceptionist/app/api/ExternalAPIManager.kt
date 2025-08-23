@@ -188,8 +188,8 @@ class ExternalAPIManager @Inject constructor() {
                 "username" to "AI Receptionist",
                 "icon_emoji" to ":robot_face:"
             )
-            
-            val response = makeAPICall(
+
+            makeAPICall(
                 endpoint = "https://hooks.slack.com/services/${getSlackWebhookToken()}",
                 method = "POST",
                 body = payload

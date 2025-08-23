@@ -10,7 +10,7 @@ import com.aireceptionist.app.ai.agents.AgentInput
 import com.aireceptionist.app.ai.agents.InputType
 import com.aireceptionist.app.data.models.CallContext
 import com.aireceptionist.app.service.CallHandlingService
-import com.aireceptionist.app.ui.call.CallActivity
+// import com.aireceptionist.app.ui.call.CallActivity
 import com.aireceptionist.app.utils.Logger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
@@ -50,10 +50,7 @@ class AIInCallService : InCallService() {
         // Start AI processing for this call
         startAICallHandling(call)
         
-        // Show call UI if this is an incoming call
-        if (call.state == Call.STATE_RINGING) {
-            showCallActivity(call)
-        }
+        // Optionally show UI for incoming calls (disabled in this build)
     }
     
     override fun onCallRemoved(call: Call) {
@@ -91,8 +88,9 @@ class AIInCallService : InCallService() {
                 val callContext = createCallContext(call)
                 
                 // Start the call handling service
+                val generatedCallId = (call.details.handle?.schemeSpecificPart ?: "unknown") + "_" + System.currentTimeMillis()
                 val serviceIntent = Intent(this@AIInCallService, CallHandlingService::class.java).apply {
-                    putExtra("call_id", call.details.telecomeCallId)
+                    putExtra("call_id", generatedCallId)
                     putExtra("caller_number", call.details.handle?.schemeSpecificPart)
                     putExtra("is_incoming", call.state == Call.STATE_RINGING)
                 }
@@ -136,8 +134,9 @@ class AIInCallService : InCallService() {
     }
     
     private fun createCallContext(call: Call): CallContext {
+        val generatedCallId = (call.details.handle?.schemeSpecificPart ?: "unknown") + "_" + System.currentTimeMillis()
         return CallContext(
-            callId = call.details.telecomeCallId,
+            callId = generatedCallId,
             callerNumber = call.details.handle?.schemeSpecificPart,
             callerName = call.details.callerDisplayName,
             callStartTime = System.currentTimeMillis(),
@@ -165,11 +164,8 @@ class AIInCallService : InCallService() {
             // Execute actions based on agent response
             response.actions.forEach { action ->
                 when (action.actionType) {
-                    com.aireceptionist.app.ai.agents.ActionType.ANSWER_CALL -> {
-                        if (call.state == Call.STATE_RINGING) {
-                            call.answer(0) // Answer with video state
-                            Logger.i(TAG, "Call answered by AI")
-                        }
+                    com.aireceptionist.app.ai.agents.ActionType.TRANSFER_CALL -> {
+                        Logger.i(TAG, "Requested transfer_call action (not implemented)")
                     }
                     com.aireceptionist.app.ai.agents.ActionType.END_CALL -> {
                         call.disconnect()
@@ -200,7 +196,7 @@ class AIInCallService : InCallService() {
         }
     }
     
-    private fun showCallActivity(call: Call) {
+    /* private fun showCallActivity(call: Call) {
         try {
             val intent = Intent(this, CallActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -215,7 +211,7 @@ class AIInCallService : InCallService() {
             Logger.e(TAG, "Error starting call activity", e)
         }
     }
-    
+*/
     private fun handleAudioStateChange(audioState: CallAudioState) {
         scope.launch {
             try {
@@ -320,11 +316,6 @@ class AIInCallService : InCallService() {
         override fun onPostDialWait(call: Call, remainingPostDialSequence: String) {
             super.onPostDialWait(call, remainingPostDialSequence)
             Logger.d(TAG, "Post dial wait: $remainingPostDialSequence")
-        }
-        
-        override fun onVideoCallChanged(call: Call, videoCall: Call.VideoCall) {
-            super.onVideoCallChanged(call, videoCall)
-            Logger.d(TAG, "Video call changed")
         }
         
         override fun onCallDestroyed(call: Call) {

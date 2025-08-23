@@ -239,12 +239,22 @@ The app provides comprehensive REST API for integration with:
    - Included rules for ONNX Runtime, TensorFlow Lite, ML Kit, and other dependencies
 
 ### Build Setup Instructions
-1. **Configure Android SDK**: Update `local.properties` with your Android SDK path
-2. **Run Build**: Execute `./gradlew build` to verify everything works
-3. **Check Dependencies**: All ML dependencies now resolve correctly from Maven Central
+1. Configure Android SDK
+   - Copy `local.properties.example` to `local.properties`
+   - Set `sdk.dir` to your Android SDK path (Windows uses backslashes)
+   - See `setup_sdk.md` for detailed steps and troubleshooting
+2. Install required SDK components (if needed)
+   - Android SDK Platform 35, Build-Tools 35.x, and Platform-Tools (via Android Studio SDK Manager or `sdkmanager`)
+3. Ensure JDK 17 is selected for Gradle
+   - Android Studio: Settings > Build Tools > Gradle > Gradle JDK = 17
+4. Run the build
+   - macOS/Linux: `./gradlew build`
+   - Windows PowerShell: `./gradlew.bat build`
+5. Verify dependencies
+   - All ML dependencies should resolve from Maven Central
 
 ### Files Added/Modified
-- ✅ `local.properties` - Android SDK configuration template
+- ✅ `local.properties.example` - Android SDK configuration template
 - ✅ `setup_sdk.md` - Detailed setup instructions for Android SDK
 - ✅ `app/proguard-rules.pro` - Comprehensive ProGuard rules for ML libraries
 - ✅ `gradle/wrapper/` - Fixed Gradle wrapper files

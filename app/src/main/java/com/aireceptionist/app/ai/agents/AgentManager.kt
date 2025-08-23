@@ -17,7 +17,15 @@ import javax.inject.Singleton
  */
 @Singleton
 class AgentManager @Inject constructor(
-    private val onDeviceLLM: OnDeviceLLM
+    private val onDeviceLLM: OnDeviceLLM,
+    private val speechRecognitionAgent: SpeechRecognitionAgent,
+    private val naturalLanguageAgent: NaturalLanguageAgent,
+    private val callRoutingAgent: CallRoutingAgent,
+    private val customerServiceAgent: CustomerServiceAgent,
+    private val voiceSynthesisAgent: VoiceSynthesisAgent,
+    private val emotionDetectionAgent: EmotionDetectionAgent,
+    private val integrationAgent: IntegrationAgent,
+    private val appointmentAgent: AppointmentAgent
 ) {
     
     private val agents = ConcurrentHashMap<String, Agent>()
@@ -41,14 +49,14 @@ class AgentManager @Inject constructor(
             
             // Create and initialize all agents (now with LLM support)
             val agentList = listOf(
-                SpeechRecognitionAgent(),
-                NaturalLanguageAgent(onDeviceLLM),
-                CallRoutingAgent(onDeviceLLM),
-                CustomerServiceAgent(onDeviceLLM),
-                VoiceSynthesisAgent(),
-                EmotionDetectionAgent(onDeviceLLM),
-                IntegrationAgent(),
-                AppointmentAgent(onDeviceLLM)
+                speechRecognitionAgent,
+                naturalLanguageAgent,
+                callRoutingAgent,
+                customerServiceAgent,
+                voiceSynthesisAgent,
+                emotionDetectionAgent,
+                integrationAgent,
+                appointmentAgent
             )
             
             // Initialize agents concurrently
@@ -296,8 +304,8 @@ class AgentManager @Inject constructor(
             userInput.contains("department", ignoreCase = true) ->
                 LLMScenario.CALL_ROUTING
                 
-            callContext.emotionalState != null && 
-            callContext.emotionalState in listOf("frustrated", "angry", "upset") ->
+            callContext.sentiment != null && 
+            callContext.sentiment in listOf("frustrated", "angry", "upset", "negative") ->
                 LLMScenario.EMOTIONAL_RESPONSE
                 
             else -> LLMScenario.CUSTOMER_INQUIRY
@@ -312,12 +320,12 @@ class AgentManager @Inject constructor(
         conversationHistory: List<String>
     ): Map<String, Any> {
         return mapOf(
-            "businessName" to (callContext.businessContext?.get("name") ?: "our business"),
+            "businessName" to "our business",
             "timeOfDay" to determineTimeOfDay(),
             "conversationHistory" to conversationHistory,
-            "callerId" to (callContext.callerId ?: "unknown"),
-            "callDuration" to callContext.callDuration,
-            "emotionalState" to (callContext.emotionalState ?: "neutral"),
+            "callerId" to callContext.callId,
+            "callDuration" to ((callContext.callEndTime ?: System.currentTimeMillis()) - callContext.callStartTime),
+            "emotionalState" to (callContext.sentiment ?: "neutral"),
             "availableSlots" to getAvailableSlots(),
             "services" to getBusinessServices(),
             "departments" to listOf("sales", "support", "billing", "general"),

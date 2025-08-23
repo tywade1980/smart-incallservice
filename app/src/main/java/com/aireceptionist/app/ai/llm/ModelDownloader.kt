@@ -26,7 +26,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class ModelDownloader @Inject constructor(
-    private val context: Context
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context
 ) {
     companion object {
         private const val TAG = "ModelDownloader"
@@ -38,9 +38,9 @@ class ModelDownloader @Inject constructor(
         private const val CONFIG_FILENAME = "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/tokenizer_config.json"
         private const val GENAI_CONFIG_FILENAME = "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/genai_config.json"
         
-        // Model checksums (will be calculated on first download)
-        private const val EXPECTED_MODEL_SIZE_MB = 2300L // Approximately 2.3GB
-        private const val MIN_MODEL_SIZE_MB = 2000L // Minimum expected size
+        // Model size expectations (sanity checks)
+        private const val EXPECTED_MODEL_SIZE_MB = 1300L // Approx for INT4 mobile build (~1.3GB)
+        private const val MIN_MODEL_SIZE_MB = 1000L // Minimum expected size (1GB)
         
         private const val MODELS_DIR = "models"
         private const val CHUNK_SIZE = 8192
@@ -253,7 +253,7 @@ class ModelDownloader @Inject constructor(
         return try {
             val modelFile = File(modelsDir, "phi-3.5-mini-instruct.onnx")
             val tokenizerFile = File(modelsDir, "tokenizer.json")
-            val configFile = File(modelsDir, "tokenizer_config.json")
+            File(modelsDir, "tokenizer_config.json")
             
             // Basic existence checks
             if (!modelFile.exists() || !tokenizerFile.exists()) {

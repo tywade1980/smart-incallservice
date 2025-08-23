@@ -92,3 +92,6 @@
 # Chart library
 -keep class com.github.mikephil.charting.** { *; }
 -dontwarn com.github.mikephil.charting.**
+
+# Keep AIDataProvider ContentProvider to avoid removal by R8/ProGuard
+-keep class com.aireceptionist.app.data.AIDataProvider { *; }
