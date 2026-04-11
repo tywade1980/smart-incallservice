@@ -4,6 +4,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import com.aireceptionist.app.ai.agents.AgentManager
+import com.aireceptionist.app.data.models.CallContext
 import com.aireceptionist.app.data.repository.CallRepository
 import com.aireceptionist.app.data.repository.AppointmentRepository
 import com.aireceptionist.app.utils.Logger
@@ -430,18 +431,58 @@ class WebAPIService : Service() {
     }
     
     private suspend fun handleCallStartedEvent(event: Map<*, *>) {
-        // Handle call started event
         Logger.i(TAG, "Processing call started event")
+        val callId = event["call_id"] as? String ?: event["callId"] as? String ?: return
+        val callerNumber = event["caller_number"] as? String ?: event["callerNumber"] as? String
+        val callerName = event["caller_name"] as? String ?: event["callerName"] as? String
+        val timestamp = (event["timestamp"] as? Number)?.toLong() ?: System.currentTimeMillis()
+        val direction = event["direction"] as? String ?: "incoming"
+
+        val callContext = CallContext(
+            callId = callId,
+            callerNumber = callerNumber,
+            callerName = callerName,
+            callStartTime = timestamp,
+            isIncoming = direction == "incoming",
+            callState = "ringing"
+        )
+        callRepository.insertCallContext(callContext)
+        Logger.i(TAG, "Call context created for webhook event: $callId")
     }
     
     private suspend fun handleCallEndedEvent(event: Map<*, *>) {
-        // Handle call ended event
         Logger.i(TAG, "Processing call ended event")
+        val callId = event["call_id"] as? String ?: event["callId"] as? String ?: return
+        val timestamp = (event["timestamp"] as? Number)?.toLong() ?: System.currentTimeMillis()
+
+        val existing = callRepository.getCallContext(callId)
+        if (existing != null) {
+            callRepository.updateCallContext(existing.copy(
+                callState = "ended",
+                callEndTime = timestamp
+            ))
+            Logger.i(TAG, "Call ended for: $callId")
+        } else {
+            Logger.w(TAG, "No call context found for ended event: $callId")
+        }
     }
     
     private suspend fun handleCallTransferredEvent(event: Map<*, *>) {
-        // Handle call transferred event
         Logger.i(TAG, "Processing call transferred event")
+        val callId = event["call_id"] as? String ?: event["callId"] as? String ?: return
+        val destination = event["destination"] as? String
+
+        val existing = callRepository.getCallContext(callId)
+        if (existing != null) {
+            callRepository.updateCallContext(existing.copy(
+                callState = "transferred",
+                humanTransferRequested = true,
+                notes = destination?.let { "Transferred to: $it" } ?: existing.notes
+            ))
+            Logger.i(TAG, "Call transferred: $callId -> ${destination ?: "unknown"}")
+        } else {
+            Logger.w(TAG, "No call context found for transfer event: $callId")
+        }
     }
     
     companion object {
