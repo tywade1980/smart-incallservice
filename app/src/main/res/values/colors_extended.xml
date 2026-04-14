@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Extended colour palette used by new UI components.
+  Complements the existing colors.xml without overwriting it.
+-->
+<resources>
+    <!-- Named aliases expected by activity layouts -->
+    <color name="white_color">#FFFFFF</color>
+    <color name="black_color">#000000</color>
+
+    <!-- Dark surface card (transcript card, status bar strip) -->
+    <color name="surface_dark_card">#1E1E2E</color>
+
+    <!-- Accent aliases used in Java/Kotlin colour references -->
+    <color name="accent_green">#4CAF50</color>
+    <color name="accent_blue">#2196F3</color>
+    <color name="accent_blue_dark">#162447</color>
+    <color name="error_red">#F44336</color>
+
+    <!-- Ensure white / black are available as resource names -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+</resources>

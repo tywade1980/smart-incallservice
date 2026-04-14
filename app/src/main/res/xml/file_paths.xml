@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FileProvider path configuration.
+  Enables safe sharing of AI model files, call recordings, and exports.
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- On-device LLM / voice model assets -->
+    <files-path name="ai_models"    path="models/" />
+    <!-- Call recording audio files -->
+    <files-path name="recordings"   path="recordings/" />
+    <!-- Exported logs / reports -->
+    <files-path name="exports"      path="exports/" />
+    <!-- General app cache -->
+    <cache-path name="app_cache"    path="." />
+    <!-- External storage (e.g. user-imported scripts) -->
+    <external-path name="external"  path="." />
+</paths>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Full-backup content rules (pre-API 31 / legacy).
+  Mirrors the intent of data_extraction_rules.xml.
+-->
+<full-backup-content>
+    <include domain="sharedpref" path="." />
+    <exclude domain="database"   path="ai_receptionist_db" />
+    <exclude domain="file"       path="models/" />
+    <exclude domain="file"       path="recordings/" />
+    <exclude domain="external"   path="." />
+</full-backup-content>
