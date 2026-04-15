@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
  *   • Auto-answer, emotion detection, call recording toggles
  *   • Escalation number
  *   • Custom instructions for the AI
+ *   • SIP/VoIP server IP, port, credentials, enable toggle
  */
 @AndroidEntryPoint
 class SettingsActivity : AppCompatActivity() {
@@ -67,6 +68,16 @@ class SettingsActivity : AppCompatActivity() {
                 }
 
                 launch {
+                    viewModel.sipConfig.collect { cfg ->
+                        binding.etSipServer.setText(cfg.serverAddress)
+                        binding.etSipPort.setText(if (cfg.port == 5060) "" else cfg.port.toString())
+                        binding.etSipUsername.setText(cfg.username)
+                        binding.etSipPassword.setText(cfg.password)
+                        binding.switchSipEnabled.isChecked = cfg.enabled
+                    }
+                }
+
+                launch {
                     viewModel.saveEvent.collect { saved ->
                         if (saved) {
                             Snackbar.make(binding.root, "Settings saved", Snackbar.LENGTH_SHORT).show()
@@ -79,17 +90,24 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun saveSettings() {
         viewModel.saveProfile(
-            businessName     = binding.etBusinessName.text.toString().trim(),
-            businessType     = binding.etBusinessType.text.toString().trim(),
-            aiPersonaName    = binding.etAiPersonaName.text.toString().trim(),
-            greeting         = binding.etGreeting.text.toString().trim(),
-            afterHoursMsg    = binding.etAfterHoursMessage.text.toString().trim(),
-            escalationNumber = binding.etEscalationNumber.text.toString().trim(),
+            businessName       = binding.etBusinessName.text.toString().trim(),
+            businessType       = binding.etBusinessType.text.toString().trim(),
+            aiPersonaName      = binding.etAiPersonaName.text.toString().trim(),
+            greeting           = binding.etGreeting.text.toString().trim(),
+            afterHoursMsg      = binding.etAfterHoursMessage.text.toString().trim(),
+            escalationNumber   = binding.etEscalationNumber.text.toString().trim(),
             customInstructions = binding.etCustomInstructions.text.toString().trim(),
-            autoAnswer       = binding.switchAutoAnswer.isChecked,
-            emotionDetection = binding.switchEmotionDetection.isChecked,
-            callRecording    = binding.switchCallRecording.isChecked,
-            speakingRate     = binding.sliderSpeakingRate.value
+            autoAnswer         = binding.switchAutoAnswer.isChecked,
+            emotionDetection   = binding.switchEmotionDetection.isChecked,
+            callRecording      = binding.switchCallRecording.isChecked,
+            speakingRate       = binding.sliderSpeakingRate.value
+        )
+        viewModel.saveSIPConfig(
+            server   = binding.etSipServer.text.toString().trim(),
+            port     = binding.etSipPort.text.toString().toIntOrNull() ?: 5060,
+            username = binding.etSipUsername.text.toString().trim(),
+            password = binding.etSipPassword.text.toString(),
+            enabled  = binding.switchSipEnabled.isChecked
         )
     }
 
